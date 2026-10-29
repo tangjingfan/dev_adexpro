@@ -3,7 +3,7 @@
 ROS 2 packages for ExPro / AdExPro, the simulator stack and the batch experiment runner. The
 colcon workspace is the repo root; setup, Docker, build and run instructions are in the
 [top-level README](../README.md). Baselines live in [../dev_baselines](../dev_baselines/README.md).
-Run output goes to `../dev_visualization/experiments/`.
+Run output goes to `../dev_results/experiments/`.
 
 ## Packages
 

@@ -15,8 +15,8 @@
 ├── dev_explore/       探索系统：autonomy stack、规划器、地图预测、
 │                      self-adapt、实验 runner
 ├── dev_baselines/     baseline 规划器（TARE、GBPlanner2、NBVP、ARiADNE、CogniPlan、MapEx、greedy）
-├── dev_visualization/ 实验数据与可视化
-│   └── experiments/   运行输出（git 忽略）
+├── dev_visualization/ ROS 可视化：prediction_eval（预测与真值对比）、prediction_heatmap（实时窗口）
+├── dev_results/       experiments/：所有运行输出（git 忽略，第一次运行时自动创建）
 └── build/ install/ log/   repo 根目录就是 colcon workspace（git 忽略）
 ```
 
@@ -92,5 +92,5 @@ tmux kill-session -t adexpro
 ./scripts/run_experiments.sh indoor_self_adapt
 ```
 
-所有输出都写到 `dev_visualization/experiments/`，说明见
-[dev_visualization/README.md](dev_visualization/README.md)。
+所有输出都写到 `dev_results/experiments/`（节点日志、AdExPro 训练日志、runner 的 CSV、prediction_eval 的结果）。运行时还会弹出一个实时热力图窗口，显示地图预测哪里对、哪里错，
+见 [dev_visualization/README.md](dev_visualization/README.md)。

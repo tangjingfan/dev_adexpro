@@ -1,7 +1,7 @@
 # Indoor: 5 runs of expro (ExPro, no online update).
 # Run order = entry order; repeats within an entry are consecutive.
 
-output_dir: dev_visualization/experiments
+output_dir: dev_results/experiments
 
 termination:
   stuck_window_s: 20.0

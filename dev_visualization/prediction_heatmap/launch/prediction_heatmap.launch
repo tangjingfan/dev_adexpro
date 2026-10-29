@@ -1,0 +1,18 @@
+<launch>
+  <!-- GT octomap + prediction_eval (scoring and recording) + the live heatmap
+       window. Same args as prediction_eval.launch. -->
+  <arg name="world" default="garage" />
+  <arg name="method" default="unknown" />
+  <arg name="include_gt" default="true" />
+
+  <include file="$(find-pkg-share prediction_eval)/launch/prediction_eval.launch">
+    <arg name="world" value="$(var world)" />
+    <arg name="method" value="$(var method)" />
+    <arg name="include_gt" value="$(var include_gt)" />
+  </include>
+
+  <node pkg="prediction_heatmap" exec="prediction_heatmap_node" name="prediction_heatmap_node" output="screen">
+    <param name="method" value="$(var method)" />
+    <param name="world" value="$(var world)" />
+  </node>
+</launch>

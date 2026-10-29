@@ -95,7 +95,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     cfg = _load_cfg(args.config)
-    output_dir = Path(cfg.get("output_dir", "dev_visualization/experiments"))
+    output_dir = Path(cfg.get("output_dir", "dev_results/experiments"))
     if not output_dir.is_absolute():
         output_dir = (args.workspace / output_dir).resolve()
     log_dir = output_dir / "logs"

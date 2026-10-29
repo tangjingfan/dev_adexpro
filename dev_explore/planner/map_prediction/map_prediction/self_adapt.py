@@ -591,7 +591,7 @@ class SelfAdaptNode(MapPredictionNode):
                     os.path.join(log_dir, "online_samples.csv"))
         # A relative online_log_dir is taken under the experiments dir (set by
         # the start scripts and the runner), so the output lands in
-        # dev_visualization/experiments/ wherever the node was launched from.
+        # dev_results/experiments/ wherever the node was launched from.
         log_dir = self.online_log_dir
         if not os.path.isabs(log_dir):
             exp = os.environ.get("EXPRO_EXPERIMENTS_DIR", "").strip() or \

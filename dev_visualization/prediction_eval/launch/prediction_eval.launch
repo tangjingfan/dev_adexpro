@@ -1,0 +1,18 @@
+<launch>
+  <!-- world: which gt_mapping_<world>.launch provides /gt_map.
+       method: tag stored with the results (expro | adexpro | oracle).
+       include_gt: start the GT octomap here; set false if something else
+       already publishes /gt_map.
+       Headless; prediction_heatmap.launch adds the live window. -->
+  <arg name="world" default="garage" />
+  <arg name="method" default="unknown" />
+  <arg name="include_gt" default="true" />
+
+  <include file="$(find-pkg-share simulator)/launch/gt_mapping_$(var world).launch" if="$(var include_gt)" />
+
+  <node pkg="prediction_eval" exec="prediction_eval_node" name="prediction_eval_node" output="screen">
+    <param name="method" value="$(var method)" />
+    <param name="world" value="$(var world)" />
+    <remap from="/visible_map" to="/projected_map" />
+  </node>
+</launch>

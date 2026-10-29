@@ -12,10 +12,10 @@
 
 # REPO = the repo root (where these scripts live, under scripts/), which is
 # also the colcon workspace (WS). Run output (node logs, online-train logs) goes to
-# dev_visualization/experiments/.
+# dev_results/experiments/.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WS="$REPO"
-EXPERIMENTS_DIR="$REPO/dev_visualization/experiments"
+EXPERIMENTS_DIR="$REPO/dev_results/experiments"
 LOG_DIR="$EXPERIMENTS_DIR/node_logs"
 mkdir -p "$LOG_DIR"
 DEACTIVATE="conda deactivate 2>/dev/null; conda deactivate 2>/dev/null"

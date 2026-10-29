@@ -15,8 +15,8 @@ Two methods:
 ├── dev_explore/       the exploration system: autonomy stack, planner, map prediction,
 │                      self-adapt, experiment runner
 ├── dev_baselines/     baseline planners (TARE, GBPlanner2, NBVP, ARiADNE, CogniPlan, MapEx, greedy)
-├── dev_visualization/ experiment data and visualization
-│   └── experiments/   run output (git-ignored)
+├── dev_visualization/ ROS visualization: prediction_eval (accuracy vs GT), prediction_heatmap (live window)
+├── dev_results/       experiments/: all run output (git-ignored, created on the first run)
 └── build/ install/ log/   the repo root is the colcon workspace (git-ignored)
 ```
 
@@ -92,4 +92,6 @@ tmux kill-session -t adexpro
 ./scripts/run_experiments.sh indoor_self_adapt
 ```
 
-All output lands in `dev_visualization/experiments/`, as described in [dev_visualization/README.md](dev_visualization/README.md).
+All output lands in `dev_results/experiments/` (node logs, AdExPro training logs, runner CSVs,
+prediction_eval results). While a method runs, a live heatmap window shows where its map predictions are right or wrong, see
+[dev_visualization/README.md](dev_visualization/README.md).

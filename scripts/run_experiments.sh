@@ -3,7 +3,7 @@
 # Usage: ./scripts/run_experiments.sh <config>
 #   config: a YAML path, or a name under dev_explore/experiment_runner/config/
 #           (e.g. indoor_self_adapt)
-# Results go to dev_visualization/experiments/ (the configs' output_dir).
+# Results go to dev_results/experiments/ (the configs' output_dir).
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 WS="$REPO"
@@ -23,5 +23,5 @@ conda deactivate 2>/dev/null; conda deactivate 2>/dev/null
 source /opt/ros/humble/setup.bash
 source "$WS/install/setup.bash"
 # --workspace: install/ for the panes it launches, and the base the configs'
-# relative output_dir (dev_visualization/experiments) resolves against.
+# relative output_dir (dev_results/experiments) resolves against.
 exec ros2 run experiment_runner runner "$CFG" --workspace "$WS"

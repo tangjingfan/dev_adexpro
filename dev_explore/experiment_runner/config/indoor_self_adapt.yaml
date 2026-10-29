@@ -2,11 +2,11 @@
 # self-supervised fine-tuning of the map predictor enabled).
 #
 # What to look at after the run:
-#   1. dev_visualization/experiments/runs/indoor/{expro,adexpro}/run_*.csv  end-of-run summary
-#   2. dev_visualization/experiments/online_train/online_train_*.csv
+#   1. dev_results/experiments/runs/indoor/{expro,adexpro}/run_*.csv  end-of-run summary
+#   2. dev_results/experiments/online_train/online_train_*.csv
 #      → loss / masked_f1 / masked_iou over training steps
 
-output_dir: dev_visualization/experiments
+output_dir: dev_results/experiments
 
 termination:
   stuck_window_s: 20.0

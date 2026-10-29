@@ -37,12 +37,24 @@ def _mapping(world_override: Optional[str] = None) -> LaunchPane:
     )
 
 
+def _prediction_eval(method: str) -> LaunchPane:
+    """GT octomap (/gt_map) + prediction_eval, scoring /predicted_map against GT.
+    Writes under <output_dir>/prediction_eval/. The oracle reads the same /gt_map.
+    Headless: batch runs open no heatmap window (prediction_heatmap.launch does)."""
+    return LaunchPane(
+        label="prediction_eval",
+        cmd_template=f"ros2 launch prediction_eval prediction_eval.launch world:={{world}} method:={method}",
+        delay_s=8.0,
+    )
+
+
 BASELINES = {
     # expro (ExPro): learned predictor, no online update.
     "expro": BaselineSpec(
         name="expro",
         mapping=_mapping(),
         extras=(
+            _prediction_eval("expro"),
             LaunchPane(
                 label="map_prediction",
                 cmd_template="ros2 launch simulator map_prediction.launch",
@@ -65,6 +77,7 @@ BASELINES = {
         name="adexpro",
         mapping=_mapping(),
         extras=(
+            _prediction_eval("adexpro"),
             LaunchPane(
                 label="map_prediction",
                 cmd_template="ros2 launch simulator map_prediction_online_update.launch",
@@ -80,17 +93,13 @@ BASELINES = {
     ),
     # Like expro, but swaps the learned predictor for the oracle node that
     # fills frontier-local windows from a GT octomap. Mirrors
-    # start_oracle.sh: adds an extra pane running gt_mapping_<world>
-    # to publish /gt_map for the oracle node to read.
+    # start_oracle.sh: the prediction_eval pane publishes /gt_map, which the
+    # oracle node reads.
     "oracle": BaselineSpec(
         name="oracle",
         mapping=_mapping(),
         extras=(
-            LaunchPane(
-                label="gt_mapping",
-                cmd_template="ros2 launch simulator gt_mapping_{world}.launch",
-                delay_s=8.0,
-            ),
+            _prediction_eval("oracle"),
             LaunchPane(
                 label="oracle_map_prediction",
                 cmd_template="ros2 launch simulator oracle_map_prediction.launch",

@@ -2,7 +2,7 @@
 # Run order is the order in which entries appear here; each entry expands
 # into `repeats` consecutive runs of (baseline, world).
 
-output_dir: dev_visualization/experiments           # relative to workspace root, or absolute
+output_dir: dev_results/experiments           # relative to workspace root, or absolute
 
 termination:
   stuck_window_s: 10.0   # sliding window length (uses odom header timestamps)
