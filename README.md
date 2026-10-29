@@ -33,6 +33,12 @@ git clone <this repo>
 git submodule update --init --recursive --remote
 ```
 
+Model weights are git-ignored. Download the FPUnet weights (`best_fpunet_256_8.pth`,
+`best_model.pth`) from
+[Google Drive](https://drive.google.com/drive/folders/1jXtpTeI6MsttXhTSDTYItPNMMTF7igY6?usp=drive_link)
+into `dev_explore/planner/map_prediction/models/`, see its
+[readme](dev_explore/planner/map_prediction/models/readme.md).
+
 ## Environment (Docker)
 
 The stack targets ROS 2 Humble (Ubuntu 22.04, Python 3.10), and the torch packages need the

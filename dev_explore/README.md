@@ -18,7 +18,7 @@ dev_explore/
 │   │   ├── map_prediction_trainer.py       OnlineTrainer (masked CE, L2-SP, distill / entropy)
 │   │   ├── oracle_map_prediction_node.py   GT-filled windows (upper bound)
 │   │   ├── config/                         map_prediction / online_update / oracle params
-│   │   └── models/                         weights (git-ignored)
+│   │   └── models/                         weights (git-ignored, download: models/readme.md)
 │   ├── global_planner/    C++: reachability → frontiers → A* distance matrix → RPV visit order
 │   ├── waypoint_bridge/   global goal → waypoints for the local planner
 │   ├── occupancy_mapping/ occupancy-grid mapping
