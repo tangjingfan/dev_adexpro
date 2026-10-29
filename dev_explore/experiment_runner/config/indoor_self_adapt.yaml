@@ -1,0 +1,21 @@
+# Self-adaptation A/B: expro (ExPro, no online learning) vs adexpro (AdExPro, online
+# self-supervised fine-tuning of the map predictor enabled).
+#
+# What to look at after the run:
+#   1. dev_visualization/experiments/runs/indoor/{expro,adexpro}/run_*.csv  end-of-run summary
+#   2. dev_visualization/experiments/online_train/online_train_*.csv
+#      → loss / masked_f1 / masked_iou over training steps
+
+output_dir: dev_visualization/experiments
+
+termination:
+  stuck_window_s: 20.0
+  stuck_dist_m: 2.5
+  warmup_s: 30.0
+  odom_silence_s: 5.0
+
+runs:
+  - baseline: adexpro
+    world: indoor
+    repeats: 1
+    max_time_s: 700

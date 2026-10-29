@@ -1,0 +1,10 @@
+<launch>
+
+  <node pkg="octomap_server" exec="octomap_server_node" name="gt_octomap_server" output="screen">
+    <param from="$(find-pkg-share simulator)/config/gt_mapping_garage.yaml" />
+    <remap from="cloud_in" to="/overall_map" />
+    <remap from="projected_map" to="/gt_map" />
+    <remap from="projected_map_updates" to="/gt_map_updates" />
+  </node>
+
+</launch>

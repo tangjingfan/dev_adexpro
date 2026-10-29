@@ -1,0 +1,14 @@
+oracle_map_prediction_node:
+  ros__parameters:
+    prediction_cycle: 2.0
+    model_input_size: 128
+    enable_prediction: true
+    prediction_expansion_cells: 50
+    frontier_cluster_eps: 3.0
+    frontier_cluster_min_samples: 1
+    frontier_kernel_size: 3
+    max_frontier_count: 20
+    max_frontier_distance: -1.0
+    # OccupancyGrid topic carrying the ground-truth map. Must share resolution
+    # (and ideally frame_id) with /visible_map; origin can differ.
+    gt_map_topic: /gt_map

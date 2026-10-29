@@ -1,0 +1,11 @@
+[submodule "dev_explore/autonomy_stack"]
+	path = dev_explore/autonomy_stack
+	url = git@github.com:tangjingfan/autonomy_stack.git
+[submodule "dev_baselines/tare_planner"]
+	path = dev_baselines/tare_planner
+	url = git@github.com:Ruizhi-Deng/tare_planner.git
+	branch = humble-jazzy
+[submodule "dev_baselines/mapex/MapEx"]
+	path = dev_baselines/mapex/MapEx
+	url = https://github.com/Ruizhi-Deng/MapEx.git
+	branch = ros2

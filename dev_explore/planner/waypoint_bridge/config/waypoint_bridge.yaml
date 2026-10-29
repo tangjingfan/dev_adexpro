@@ -1,0 +1,30 @@
+waypoint_bridge:
+  ros__parameters:
+    lookahead_distance: 5.0
+    reach_threshold: 1.5
+    occupied_threshold: 50
+    astar_max_nodes: 50000
+    preferred_clearance_cells: 3.0
+    clearance_penalty_weight: 2.0
+    publish_rate: 5.0
+    # When /predicted_map + /confidence_map are available the bridge plans in
+    # predicted-map space and only allows cells whose prediction confidence
+    # meets this threshold. Visible-known cells always have confidence == 1.0
+    # in /confidence_map (set by map_prediction_node), so this gate only acts
+    # on visible-UNKNOWN cells that the model has filled in.
+    # No-op when /predicted_map isn't published (fallback to visible-only A*).
+    confidence_threshold: 0.5
+    # Bias the *start* of each A* path toward the robot's recent travel
+    # direction (direction of motion, not heading — the platform drives both
+    # forwards and backwards) so the path commits to roughly the same way it
+    # was already going instead of doubling back.
+    #   direction_bias_weight       — penalty scale; 0 disables the bias. A step
+    #                                 reversing the travel direction costs up to
+    #                                 2*weight extra at the start cell.
+    #   direction_bias_range_cells  — how many cells from the start the bias
+    #                                 applies, fading linearly to 0.
+    #   direction_min_dist          — min travel (m) before the direction is
+    #                                 refreshed; filters odometry jitter.
+    direction_bias_weight: 1.0
+    direction_bias_range_cells: 5.0
+    direction_min_dist: 0.2

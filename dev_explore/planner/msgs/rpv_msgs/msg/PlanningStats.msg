@@ -1,0 +1,14 @@
+std_msgs/Header header
+float64 compute_reachability_time_ms
+float64 cluster_frontiers_time_ms
+float64 build_distance_matrix_time_ms
+float64 local_plan_time_ms
+float64 global_plan_time_ms
+float64 total_planning_time_ms
+bool replan_needed
+float64 time_exceeded_current
+float64 time_exceeded_target
+bool time_exceeded
+float64 path_distance_current
+float64 path_distance_target
+bool path_distance_exceeded

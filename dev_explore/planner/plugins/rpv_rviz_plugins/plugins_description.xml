@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<library path="rpv_rviz_plugins">
+  <class name="rpv_rviz_plugins/RPVMonitorPanel"
+         type="rpv_rviz_plugins::RPVMonitorPanel"
+         base_class_type="rviz_common::Panel">
+    <description>
+      Dockable RViz panel to display RPV planning states and timings.
+    </description>
+  </class>
+</library>

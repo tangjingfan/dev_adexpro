@@ -1,0 +1,8 @@
+# Build context (repo root) for docker/Dockerfile: only what the image needs.
+*
+!docker/environment.yml
+!dev_explore/**/package.xml
+!dev_baselines/**/package.xml
+!dev_baselines/mapex/MapEx/range_libc
+dev_baselines/mapex/MapEx/range_libc/pywrapper/build
+dev_baselines/mapex/MapEx/range_libc/pywrapper/dist

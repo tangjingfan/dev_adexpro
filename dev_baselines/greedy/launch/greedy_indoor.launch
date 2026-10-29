@@ -1,0 +1,16 @@
+<launch>
+
+  <node pkg="greedy" exec="greedy_node" name="greedy_node" output="screen">
+    <param from="$(find-pkg-share greedy)/config/greedy.yaml" />
+    <remap from="/visible_map" to="/projected_map" />
+  </node>
+
+  <node pkg="waypoint_bridge" exec="waypoint_bridge" name="waypoint_bridge" output="screen">
+    <param from="$(find-pkg-share waypoint_bridge)/config/waypoint_bridge.yaml" />
+    <remap from="/padded_visible_map" to="/projected_map" />
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen"
+      args="-d $(find-pkg-share greedy)/rviz/greedy.rviz --ros-args --log-level WARN" />
+
+</launch>

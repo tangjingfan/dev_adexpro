@@ -1,0 +1,15 @@
+<launch>
+
+  <node pkg="global_planner" exec="global_planner_node" name="global_planner_node" output="screen">
+    <param from="$(find-pkg-share global_planner)/config/default_planner.yaml" />
+    <remap from="/visible_map" to="/projected_map" />
+  </node>
+
+  <node pkg="waypoint_bridge" exec="waypoint_bridge" name="waypoint_bridge" output="screen">
+    <param from="$(find-pkg-share waypoint_bridge)/config/waypoint_bridge.yaml" />
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen"
+        args="-d $(find-pkg-share simulator)/rviz/expro.rviz" />
+
+</launch>

@@ -1,0 +1,33 @@
+# experiment_runner config
+# Run order is the order in which entries appear here; each entry expands
+# into `repeats` consecutive runs of (baseline, world).
+
+output_dir: dev_visualization/experiments           # relative to workspace root, or absolute
+
+termination:
+  stuck_window_s: 10.0   # sliding window length (uses odom header timestamps)
+  stuck_dist_m: 0.5      # if max planar travel in window < this → stuck
+  warmup_s: 30.0         # wall-clock grace after begin_run before stuck/crash apply
+  odom_silence_s: 5.0    # no /state_estimation for this long → crash
+
+runs:
+  - baseline: expro
+    world: matterport
+    repeats: 3
+    max_time_s: 1200
+
+  - baseline: tare
+    world: matterport
+    repeats: 3
+    max_time_s: 1200
+
+  # - baseline: nbvplanner
+  #   world: indoor
+  #   repeats: 3
+  #   max_time_s: 1200
+
+  # Example: a longer matterport sweep
+  # - baseline: expro
+  #   world: matterport
+  #   repeats: 5
+  #   max_time_s: 1800

@@ -1,0 +1,8 @@
+<launch>
+
+  <node pkg="map_prediction" exec="self_adapt_node" name="map_prediction_node" output="screen">
+    <param from="$(find-pkg-share map_prediction)/config/online_update.yaml" />
+    <remap from="/visible_map" to="/projected_map" />
+  </node>
+
+</launch>

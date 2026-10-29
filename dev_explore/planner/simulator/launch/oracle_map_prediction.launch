@@ -1,0 +1,8 @@
+<launch>
+
+  <node pkg="map_prediction" exec="oracle_map_prediction_node" name="oracle_map_prediction_node" output="screen">
+    <param from="$(find-pkg-share map_prediction)/config/oracle_map_prediction.yaml" />
+    <remap from="/visible_map" to="/projected_map" />
+  </node>
+
+</launch>

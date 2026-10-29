@@ -1,0 +1,24 @@
+<launch>
+
+<!-- TODO fix parameters for matterport scene -->
+
+  <node pkg="greedy" exec="greedy_node" name="greedy_node" output="screen">
+    <param from="$(find-pkg-share greedy)/config/greedy.yaml" />
+    <param name="cluster_size" value="20" />
+    <param name="distance_threshold" value="1.0" />
+    <param name="travel_distance_threshold" value="1.0" />
+    <remap from="/visible_map" to="/projected_map" />
+  </node>
+
+  <node pkg="waypoint_bridge" exec="waypoint_bridge" name="waypoint_bridge" output="screen">
+    <param from="$(find-pkg-share waypoint_bridge)/config/waypoint_bridge.yaml" />
+    <param name="lookahead_distance" value="1.5" />
+    <param name="reach_threshold" value="1.0" />
+    <param name="preferred_clearance_cells" value="5.0" />
+    <remap from="/padded_visible_map" to="/projected_map" />
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen"
+      args="-d $(find-pkg-share greedy)/rviz/greedy.rviz --ros-args --log-level WARN" />
+
+</launch>

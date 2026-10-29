@@ -1,0 +1,32 @@
+nbvplanner_node:
+  ros__parameters:
+    vehicle_name: av1
+    planning_cycle: 5.0            # seconds between fallback re-plans 
+    goal_reach_threshold: 0.5    # distance to goal at which we consider it "reached" and re-plan
+    waypoint_topic: /way_point
+    exploration_enabled_topic: /exploration_enabled
+    exploration_enabled_initial: true
+
+    # Bounding box for RRT sampling is derived automatically from the
+    # visible map extent at each planning cycle — no static config needed.
+
+    # Robot physical parameters
+    system:
+      vehicle_radius: 0.5          # footprint radius for collision inflation [m]
+
+    # RRT tree parameters
+    nbvp:
+      tree:
+        extension_range: 3.0       # max edge length per iteration [m]
+        initial_iterations: 15     # min iterations after first gain found
+        cutoff_iterations: 1000     # hard iteration limit before giving up
+        allow_unknown_traversal: false  # false => tree grows only in known free area
+
+      gain:
+        range: 3.0                 # radius of information-gain disc [m]
+        unmapped: 1.0              # gain weight for unknown cells
+        free: 0.0                  # gain weight for free cells
+        degressive_coeff: 0.25     # exponential distance discount coefficient
+        zero: 0.05                 # minimum gain to count a node as "useful"
+
+    occupied_threshold: 50         # OccupancyGrid value treated as obstacle

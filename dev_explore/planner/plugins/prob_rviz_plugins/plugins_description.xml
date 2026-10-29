@@ -1,0 +1,17 @@
+<library path="prob_rviz_plugins">
+  <class name="prob_rviz_plugins/ProbGrid"
+         type="prob_rviz_plugins::ProbGridDisplay"
+         base_class_type="rviz_common::Display">
+    <description>
+      Displays 2D confidence maps generated from prob_msgs/msg/ProbGrid messages.
+    </description>
+    <message_type>prob_msgs/msg/ProbGrid</message_type>
+  </class>
+  <class name="prob_rviz_plugins/PredictionPanel"
+         type="prob_rviz_plugins::PredictionPanel"
+         base_class_type="rviz_common::Panel">
+    <description>
+      Dockable RViz panel that shows predicted map and confidence map in separate 2D views.
+    </description>
+  </class>
+</library>

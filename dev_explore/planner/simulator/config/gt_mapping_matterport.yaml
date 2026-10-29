@@ -1,0 +1,18 @@
+gt_octomap_server:
+  ros__parameters:
+    resolution: 0.2
+    frame_id: map
+    base_frame_id: vehicle
+    occupancy_min_z: 0.2
+    occupancy_max_z: 2.5
+    latch: false
+    # -1 == unlimited (OctoMap convention). /overall_map carries the whole
+    # scene each frame, so we want every ray from the vehicle to reach its
+    # hit point; the regular per-env range (5..22 m) is too short.
+    # octomap_server clamps the declared range to [-1.0, 100.0], so we can't
+    # use a large positive value here.
+    sensor_model.max_range: -1.0
+    sensor_model.hit: 1.0
+    sensor_model.miss: 0.45
+    sensor_model.max: 1.0
+    sensor_model.min: 0.2

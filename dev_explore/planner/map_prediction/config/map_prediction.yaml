@@ -1,0 +1,18 @@
+map_prediction_node:
+  ros__parameters:
+    prediction_cycle: 2.0
+    model_path: models/best_fpunet_256_8.pth
+    device: auto
+    model_input_size: 128
+    inference_batch_size: 8
+    enable_prediction: true
+    prediction_expansion_cells: 50
+    frontier_cluster_eps: 3.0
+    # The NEAREST this many frontiers to the robot (extract_clustered_frontiers
+    # now sorts nearest-first). Prediction is only actionable locally, so spend
+    # the budget on the closest frontiers rather than an arbitrary global slice
+    # or brute-forcing all of them (which just scatters far-field phantom).
+    max_frontier_count: 20
+    max_frontier_distance: -1.0
+
+    use_trt: true

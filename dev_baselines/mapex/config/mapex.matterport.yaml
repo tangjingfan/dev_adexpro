@@ -1,0 +1,25 @@
+mapex_node:
+  ros__parameters:
+    # ── Model paths (override via launch args or command line) ───────────────
+    big_lama_model_path: "dev_baselines/mapex/MapEx/pretrained_models/weights/big_lama"
+    ensemble_model_dir: "dev_baselines/mapex/MapEx/pretrained_models/weights/lama_ensemble" # should launch at root
+
+    # ── Inference ────────────────────────────────────────────────────────────
+    lama_device: "cuda:0"
+    lama_transform_variant: "default_map_eval"
+    lama_out_size: 512
+
+    # ── Planning ─────────────────────────────────────────────────────────────
+    planning_cycle: 1.5          # seconds between planning ticks
+    pixel_per_meter: 5.0         # octomap_server resolution=0.5m/px -> 2px/m
+    cur_pose_dist_threshold_m: 1.0
+    unknown_as_occ: true
+    use_distance_transform_for_planning: true
+    dilate_diam_for_planning: 3
+
+    # ── Sensor / visibility ──────────────────────────────────────────────────
+    laser_range_m: 10.0
+    pred_num_laser: 250
+
+    # ── Controller ───────────────────────────────────────────────────────────
+    ind_to_move_per_step: 3

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>minkindr_conversions</name>
+  <version>1.0.0</version>
+  <description>
+    Conversions between minkindr and ROS 2 messages / tf2 types.
+    Header-only. ROS 2 port of github.com/ethz-asl/minkindr_ros.
+  </description>
+
+  <maintainer email="tangjingfan@gmail.com">tangjingfan</maintainer>
+  <author email="helenoleynikova@gmail.com">Helen Oleynikova</author>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>eigen</depend>
+  <depend>libgoogle-glog-dev</depend>
+  <depend>geometry_msgs</depend>
+  <depend>minkindr</depend>
+  <depend>rclcpp</depend>
+  <depend>tf2</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

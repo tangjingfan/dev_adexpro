@@ -1,0 +1,11 @@
+<launch>
+
+  <node pkg="nbvplanner" exec="nbvplanner_node" name="nbvplanner_node" output="screen">
+    <param from="$(find-pkg-share nbvplanner)/config/nbvplanner.yaml" />
+    <remap from="/visible_map" to="/projected_map" />
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen"
+        args="-d $(find-pkg-share nbvplanner)/rviz/nbvplanner.rviz --ros-args --log-level WARN" />
+
+</launch>

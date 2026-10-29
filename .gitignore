@@ -1,0 +1,30 @@
+# ide
+.vscode/
+.claude/
+
+# python 
+__pycache__/
+
+# ros2
+build/
+install/
+log/
+
+# checkpoint
+*.pth
+
+# logfiles
+*.log
+
+# vibe coding
+.codex
+.copilot
+.continue
+.agents/
+CLAUDE.md
+
+# experiment output (runner CSVs, per-node logs, online train logs, plots)
+experiments/
+# legacy paths — kept so pre-migration data stays ignored
+result/
+experiment_log/

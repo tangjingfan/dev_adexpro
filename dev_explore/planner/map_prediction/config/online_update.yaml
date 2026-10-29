@@ -1,0 +1,87 @@
+map_prediction_node:
+  ros__parameters:
+    prediction_cycle: 2.0
+    model_path: models/best_fpunet_256_8.pth
+    device: auto
+    model_input_size: 128
+    inference_batch_size: 8
+    enable_prediction: true
+    prediction_expansion_cells: 50
+    frontier_cluster_eps: 3.0
+    # The NEAREST this many frontiers to the robot (sorted nearest-first); see
+    # map_prediction.yaml. Local budget keeps eager (TRT-off) inference cheap too.
+    max_frontier_count: 20
+    max_frontier_distance: -1.0
+
+    # Self-adapt (AdExPro, self_adapt_node): online self-supervised fine-tuning.
+    # The trainable net is always eager, so TRT is off regardless of use_trt.
+    # adapt_policies supply the training pairs; each fills its weight's share of
+    # every batch (see self_adapt.ADAPT_POLICIES).
+    adapt_policies: ["frontier_replay", "explored_replay"]
+    adapt_policy_weights: [0.5, 0.5]
+    # explored_replay: stage an exploration state around a random explored
+    # viewpoint (free space within a 5-20 m geodesic radius) and supervise the
+    # window up to 20 m beyond what it observed.
+    explored_radius_min_m: 5.0
+    explored_radius_max_m: 20.0
+    explored_label_max_m: 20.0
+    # Halved from 5e-5 to damp the round-to-round oscillation seen with the
+    # entropy term (reach IoU swung 0.08<->0.24 between adjacent rounds).
+    learning_rate: 0.000025
+    l2sp_lambda: 0.01
+    train_batch_size: 8
+    # A round = this many gradient steps; inference weights sync after each
+    # round, and rounds repeat every train_round_interval_s. Training runs in
+    # its own thread, parallel to (never blocking) prediction.
+    train_steps_per_round: 16
+    # A round's 16 steps take ~5 s on GPU (~316 ms/step); at 10 s the loop sat
+    # idle ~2/3 of the time. Lowered to 2 s: ~7 s/round (~2x training throughput)
+    # while still letting ~3 new captures enter the replay buffer between rounds
+    # (prediction_cycle 2 s), so it isn't re-training the same buffer to death.
+    train_round_interval_s: 2.0
+    # A (input, target) pair must reveal at least this many NEW cells
+    # (UNKNOWN in input, observed in target) to be used for training — those
+    # are the only cells CE supervises on, so a stationary/duplicated window
+    # has zero useful signal even if the target is full of already-known cells.
+    label_min_new_cells: 200
+    replay_buffer_size: 2000
+    # Spatial de-duplication of the replay buffer. A capture is taken for every
+    # frontier once per prediction_cycle, so a place the robot lingers near
+    # re-enters the buffer every cycle: measured over one indoor run, 201
+    # distinct places produced 4689 samples and the hottest 10% of places
+    # accounted for 69% of them, so uniform sampling was weighting the gradient
+    # by dwell time. Captures are bucketed by world position and only the newest
+    # replay_per_bucket kept per bucket. Bucket edge in metres; 0 disables and
+    # restores the plain deque for A/B.
+    replay_bucket_size_m: 2.0
+    replay_per_bucket: 2
+    train_warmup_samples: 20
+    freeze_encoder: true
+    # CE class weights [free, occupied, unknown]. The node default [0.2, 0.6, 0.2]
+    # penalised missing an occupied cell 3x more than missing a free one, which
+    # drove the pessimistic drift on the validation curve (invented walls up,
+    # invented free down, net error flat). Balanced free/occupied here (same 1.0
+    # total, so the CE-vs-distill scale is unchanged) to counter it.
+    class_weights: [0.4, 0.4, 0.2]
+    # Distillation anchor strength on unsupervised (unknown) cells: pins the far
+    # field to the frozen prior. That prior is phantom-heavy (over-connects
+    # space), so the anchor freezes the very error we want to fix. EXPERIMENT:
+    # off, replaced by the entropy term below (low-confidence far field instead
+    # of prior-anchored far field). Set back to 1.0 to restore the anchor.
+    distill_weight: 0.0
+    distill_temperature: 1.0
+    # Distance-weighted entropy on the unsupervised far field (replaces distill):
+    # push deep-unknown cells toward low confidence, ramping 0 -> 1 over
+    # entropy_far_cells from the observed footprint so near-frontier extrapolation
+    # is preserved. The planner discounts low-confidence frontiers, so this
+    # attacks phantom without a planner change. 0 disables.
+    entropy_weight: 0.1
+    entropy_far_cells: 25.0
+    # Online hard-example mining. Extra cross-entropy weight on the supervised
+    # (newly observed) cells the model got wrong — the high-error near-frontier
+    # band the range profile shows peaking at the observation boundary. 0 keeps
+    # the uniform weighting; try ~1-3 to concentrate the update on mistakes.
+    # Watch the optimistic/pessimistic error split when raising it.
+    hard_example_weight: 0.0
+    # Relative to $EXPRO_EXPERIMENTS_DIR (dev_visualization/experiments), see self_adapt.
+    online_log_dir: "online_train"

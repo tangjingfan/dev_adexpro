@@ -1,0 +1,12 @@
+<launch>
+
+  <node pkg="occupancy_mapping" exec="occupancy_mapping_node" name="occupancy_mapping_node" output="screen">
+    <param from="$(find-pkg-share simulator)/config/occupancy_matterport.yaml" />
+  </node>
+
+  <!-- <node pkg="octomap_server" exec="octomap_server_node" name="octomap_server" output="screen">
+    <param from="$(find-pkg-share simulator)/config/mapping_matterport.yaml" />
+    <remap from="cloud_in" to="/sensor_scan" />
+  </node> -->
+
+</launch>

@@ -1,0 +1,11 @@
+greedy_node:
+  ros__parameters:
+    vehicle_name: av1
+    planning_cycle: 1.0
+    cluster_size: 6
+    occupied_threshold: 50
+    distance_threshold: 3.0
+    travel_distance_threshold: 3.0
+    exploration_enabled_topic: /exploration_enabled
+    exploration_enabled_initial: true
+    replan_cycle: 1.5

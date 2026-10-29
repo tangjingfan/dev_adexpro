@@ -1,0 +1,159 @@
+global_planner_node:
+  ros__parameters:
+    # Timing
+    checker_cycle: 0.1
+    planning_time_limit: 1.0
+
+    # Frontier detection
+    max_range_of_local_frontiers: 120.0 # cells
+    frontier_detection_range: -1.0        # -1 = use full map
+    frontier_unknown_neighbor_threshold: 3
+    # Frontier downsampling via Poisson-disk thinning. cluster_size is the
+    # thinning radius in cells: accepted frontiers are kept pairwise farther
+    # apart than this, yielding well-spread representatives without redundancy.
+    # min_marginal_gain is the noise threshold: a candidate with fewer than this
+    # many raw frontiers within cluster_size (itself included) is discarded,
+    # which drops isolated specks on jagged boundaries. Sensible defaults:
+    # 2 = drop singletons only; raise to 3-5 for stronger smoothing of
+    # noisy maps.
+    local_cluster_size: 15  # cells
+    global_cluster_size: 60 # cells
+    local_min_marginal_gain: 2
+    global_min_marginal_gain: 2
+    # NOTE: max_frontiers_to_plan caps the GLOBAL vertex set only
+    # (buildGlobalPlanningVertices). The local set goes into the solver whole,
+    # and the RPV search is exponential in vertex count — watch the "RPV: N
+    # vertices -> T ms" log line, and note that a timeout which finds no
+    # complete tour fails the plan outright rather than degrading.
+    max_frontiers_to_plan: 20
+    range_threshold_global_frontier: 6.0
+
+    # Predicted-region grouping. findPredictedSpaceFrontiers accepts every
+    # predicted-free cell the robot hasn't observed — the interior of a
+    # predicted room included — so what comes out is a sampling of predicted
+    # AREA, not a set of boundaries. Grouping collapses those cells into one
+    # vertex per connected predicted region, positioned at the region's
+    # entrance (the member reached first through predicted space) and carrying
+    # the region's mean confidence as its existence probability.
+    #
+    # Versus the Poisson thinning it replaces: the representative is meaningful
+    # and stable rather than whichever cell the thinning happened to keep, the
+    # probability is averaged rather than one cell's possibly-noisy value, and
+    # a single connected space stops being split into several vertices by a
+    # radius that has to be retuned per resolution and scene.
+    #
+    # OFF for now: in sim it left too few predicted vertices, and putting each
+    # region's single vertex at its entrance placed it right on top of the
+    # map-edge frontier for the same opening. Kept for A/B — the grouping
+    # semantics (stable representative, averaged probability, no arbitrary
+    # radius) are still the better story if the count issue can be addressed,
+    # e.g. by emitting several vertices for a large region instead of one.
+    predicted_region_grouping: false
+    # Regions smaller than this are dropped as prediction noise rather than
+    # promoted to a planning target. Only used when grouping is on.
+    predicted_region_min_cells: 20
+
+    # Minimum separation (cells) between a predicted frontier and a map-edge
+    # one. The two extraction pipelines are thinned independently — map edges
+    # at local_cluster_size, predicted at global_cluster_size — so nothing
+    # otherwise stops a predicted representative from landing on top of a
+    # map-edge one, describing the same opening twice and spending two solver
+    # vertices on it. The map-edge copy wins (it is the certain one, p = 1).
+    # Deliberately small: this removes near-duplicates, it is not a spacing
+    # knob. 0 disables. Watch the "Closest pair (cells)" log line to tune it.
+    cross_source_min_separation_cells: 5.0
+
+    # Replanning thresholds
+    replan_path_length_threshold: -1.0 # disable path length requirement for replan; anti-stuck
+    replan_time_threshold: 2.0
+    global_planning_failure_threshold: 1
+
+    # Soft-commitment (TARE-style hysteresis). Each successful local plan
+    # records the next-hop target's world position; on the following replan
+    # the edge from the robot vertex to whichever current vertex sits within
+    # `local_hysteresis_match_radius` meters of that recorded position has
+    # its cost multiplied by `local_hysteresis_factor` before being passed
+    # to the RPV solver. This biases the solver toward keeping the same
+    # first hop across cycles, suppressing the "sudden U-turn" caused by
+    # frontier list churn. factor = 1.0 disables the bias; ~0.85 is a
+    # sensible starting point. Cleared on global-planning success.
+    local_hysteresis_factor: 0.85
+    local_hysteresis_match_radius: 1.5
+
+    # Global guide (TARE-style local/global coupling). Every
+    # `global_guide_period` planning cycles the coarse tour over the *global*
+    # frontiers is re-solved and its first stop cached; that stop is then
+    # appended to every local vertex set as a boundary condition, so the local
+    # RPV orders its frontiers around leaving toward where the global level
+    # wants to go, instead of solving the local set in isolation and only
+    # consulting the global one after a local failure. It also means an empty
+    # local set still produces a plan (drive to the guide) rather than falling
+    # into the local-failure path.
+    #
+    # The period exists because refreshing the guide costs a second distance
+    # matrix + RPV solve, while the answer it gives ("which way do I leave the
+    # local horizon") is stable across many local replans. 1 = refresh every
+    # cycle. The guide is also refreshed early whenever it becomes unavailable.
+    #
+    # This overlaps in purpose with local_hysteresis_factor above: both fight
+    # first-hop churn. The hysteresis is kept enabled for now so the two can be
+    # compared; once the guide is validated in sim, set the factor to 1.0 and
+    # let the commitment come from the global level instead of from a discount
+    # on last cycle's choice.
+    global_guide_enabled: true
+    global_guide_period: 3
+
+    # A* search
+    turn_cost_factor: 2.0
+    cardinal_move_cost: 1.0
+    diagonal_move_cost: 1.414
+    neighbor_safety_radius: 1
+    # Hard minimum corridor half-width (in cells): cells closer than this to an
+    # occupied obstacle are treated as untraversable, so the planner won't route
+    # through — or commit to frontiers reachable only via — passages too narrow
+    # for the robot. Measured to obstacles only (not unknown space), so frontiers
+    # at the exploration edge keep full clearance. A grace toward the robot's own
+    # clearance prevents it trapping itself against a wall. 0 disables the gate.
+    # The robot needs a corridor roughly >= 2 * min_clearance_cells wide; at
+    # 0.2 m/cell, 2.0 ≈ 0.8 m.
+    min_clearance_cells: 1.25
+    # Narrow-passage budget: the longest UNINTERRUPTED run of cells closer than
+    # min_clearance_cells to an obstacle that a robot -> frontier path may thread
+    # before the frontier is dropped as "only reachable via a too-narrow passage".
+    # It is the longest consecutive run, NOT the total along the path, so a long
+    # route that merely brushes walls now and then is kept (regions behind a brief
+    # pinch stay explorable); a genuine long narrow tunnel exceeds it and is
+    # discarded. Raise to tolerate longer narrow stretches.
+    clearance_tight_cell_budget: 10
+    occupied_cell_threshold: 50
+
+    # Predicted map
+    predicted_confidence_multiplier: 1.0
+    predicted_traversable_threshold: 65
+    predicted_occupied_penalty: 10.0
+    # Inflate A* step cost for cells whose traversability is only justified
+    # by the prediction (visible map == unknown). Each predicted-only step
+    # contributes baseCost * (1 + alpha) instead of baseCost, so total path
+    # cost ≈ length * (1 + alpha * predicted_fraction). A path that is
+    # mostly real visible-free is unchanged; a path that depends on a
+    # predicted "shortcut" pays a proportional surcharge. Prevents predicted
+    # shortcuts from flipping the RPV solver's frontier-visit ordering when
+    # only some edges in the matrix depend on prediction. 0.0 = trust
+    # prediction fully (current behaviour); ~0.5 = mild conservatism;
+    # >= 1.0 = strong bias toward visible routes.
+    predicted_edge_inflation_alpha: 0.5
+    # Same gate the waypoint_bridge applies: A* may only cross cells whose
+    # prediction confidence is >= confidence_threshold AND whose corresponding
+    # visible cell value is not > 0 (the latter is built into isIndexTraversable
+    # / isStartOrGoalBlocked, no separate param). Keeps the two planners'
+    # reachability views consistent so global_planner doesn't promise frontiers
+    # that the bridge will then reject.
+    confidence_threshold: 0.5
+
+    # Parallelism
+    distance_matrix_worker_count: 0       # 0 = auto
+    distance_matrix_parallel_min_vertices: 8
+
+    # Exploration control
+    exploration_enabled_initial: true
+    exploration_enabled_topic: "/exploration_enabled"

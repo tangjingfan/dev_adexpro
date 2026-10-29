@@ -1,0 +1,16 @@
+occupancy_mapping_node:
+  ros__parameters:
+    frame_id: map
+    scan_topic: /registered_scan
+    odom_topic: /state_estimation
+    map_topic: /projected_map
+    resolution: 0.2
+    max_range: 7.5
+    obstacle_min_z: 0.2      # below -> ground, excluded (floor stays free)
+    obstacle_max_z: 2.5      # above -> ceiling, excluded
+    publish_period: 0.5
+    prob_hit: 0.7
+    prob_miss: 0.4
+    clamp_min: 0.12
+    clamp_max: 0.97
+    occupancy_prob_thresh: 0.5

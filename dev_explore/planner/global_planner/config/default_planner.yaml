@@ -1,0 +1,88 @@
+global_planner_node:
+  ros__parameters:
+    # Timing
+    checker_cycle: 0.1
+    planning_time_limit: 1.0
+
+    # Frontier detection
+    max_range_of_local_frontiers: 70.0
+    frontier_detection_range: -1.0        # -1 = use full map
+    frontier_unknown_neighbor_threshold: 3
+    # Frontier downsampling via Poisson-disk thinning. cluster_size is the
+    # thinning radius in cells: accepted frontiers are kept pairwise farther
+    # apart than this, yielding well-spread representatives without redundancy.
+    # min_marginal_gain is the noise threshold: a candidate with fewer than this
+    # many raw frontiers within cluster_size (itself included) is discarded,
+    # which drops isolated specks on jagged boundaries. Sensible defaults:
+    # 2 = drop singletons only; raise to 3-5 for stronger smoothing of
+    # noisy maps.
+    local_cluster_size: 8
+    global_cluster_size: 30
+    local_min_marginal_gain: 2
+    global_min_marginal_gain: 2
+    max_frontiers_to_plan: 20
+    range_threshold_global_frontier: 6.0
+
+    # Replanning thresholds
+    replan_path_length_threshold: -1.0 # disable path length requirement for replan; anti-stuck
+    replan_time_threshold: 2.0
+    global_planning_failure_threshold: 1
+
+    # Soft-commitment (TARE-style hysteresis). Each successful local plan
+    # records the next-hop target's world position; on the following replan
+    # the edge from the robot vertex to whichever current vertex sits within
+    # `local_hysteresis_match_radius` meters of that recorded position has
+    # its cost multiplied by `local_hysteresis_factor` before being passed
+    # to the RPV solver. This biases the solver toward keeping the same
+    # first hop across cycles, suppressing the "sudden U-turn" caused by
+    # frontier list churn. factor = 1.0 disables the bias; ~0.85 is a
+    # sensible starting point. Cleared on global-planning success.
+    local_hysteresis_factor: 0.85
+    local_hysteresis_match_radius: 1.5
+
+    # A* search
+    turn_cost_factor: 2.0
+    cardinal_move_cost: 1.0
+    diagonal_move_cost: 1.414
+    neighbor_safety_radius: 1
+    # Hard minimum corridor half-width (in cells): cells closer than this to an
+    # occupied obstacle are treated as untraversable, so the planner won't route
+    # through — or commit to frontiers reachable only via — passages too narrow
+    # for the robot. Measured to obstacles only (not unknown space), so frontiers
+    # at the exploration edge keep full clearance. A grace toward the robot's own
+    # clearance prevents it trapping itself against a wall. 0 disables the gate.
+    # The robot needs a corridor roughly >= 2 * min_clearance_cells wide; at
+    # 0.2 m/cell, 2.0 ≈ 0.8 m.
+    min_clearance_cells: 1.0
+    occupied_cell_threshold: 50
+
+    # Predicted map
+    predicted_confidence_multiplier: 1.0
+    predicted_traversable_threshold: 65
+    predicted_occupied_penalty: 10.0
+    # Inflate A* step cost for cells whose traversability is only justified
+    # by the prediction (visible map == unknown). Each predicted-only step
+    # contributes baseCost * (1 + alpha) instead of baseCost, so total path
+    # cost ≈ length * (1 + alpha * predicted_fraction). A path that is
+    # mostly real visible-free is unchanged; a path that depends on a
+    # predicted "shortcut" pays a proportional surcharge. Prevents predicted
+    # shortcuts from flipping the RPV solver's frontier-visit ordering when
+    # only some edges in the matrix depend on prediction. 0.0 = trust
+    # prediction fully (current behaviour); ~0.5 = mild conservatism;
+    # >= 1.0 = strong bias toward visible routes.
+    predicted_edge_inflation_alpha: 0.5
+    # Same gate the waypoint_bridge applies: A* may only cross cells whose
+    # prediction confidence is >= confidence_threshold AND whose corresponding
+    # visible cell value is not > 0 (the latter is built into isIndexTraversable
+    # / isStartOrGoalBlocked, no separate param). Keeps the two planners'
+    # reachability views consistent so global_planner doesn't promise frontiers
+    # that the bridge will then reject.
+    confidence_threshold: 0.5
+
+    # Parallelism
+    distance_matrix_worker_count: 0       # 0 = auto
+    distance_matrix_parallel_min_vertices: 8
+
+    # Exploration control
+    exploration_enabled_initial: true
+    exploration_enabled_topic: "/exploration_enabled"

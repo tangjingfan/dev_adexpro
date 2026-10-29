@@ -1,0 +1,25 @@
+<launch>
+
+  <node pkg="global_planner" exec="global_planner_node" name="global_planner_node" output="screen">
+    <param from="$(find-pkg-share global_planner)/config/coarse_planner.yaml" />
+    <remap from="/visible_map" to="/projected_map" />
+  </node>
+
+  <node pkg="waypoint_bridge" exec="waypoint_bridge" name="waypoint_bridge" output="screen" args="--ros-args --log-level warn">
+    <param from="$(find-pkg-share waypoint_bridge)/config/waypoint_bridge.yaml" />
+    <param name="reach_threshold" value="2.0" />
+    <param name="occupied_threshold" value="50" />
+    <param name="astar_max_nodes" value="100000" />
+    <param name="preferred_clearance_cells" value="3.0" />
+    <param name="clearance_penalty_weight" value="1.0" />
+    <param name="publish_rate" value="5.0" />
+    <param name="confidence_threshold" value="0.5" />
+    <param name="direction_bias_weight" value="0.5" />
+    <param name="direction_bias_range_cells" value="3.0" />
+    <param name="direction_min_dist" value="0.2" />
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen"
+        args="-d $(find-pkg-share simulator)/rviz/expro.rviz --ros-args --log-level warn" />
+
+</launch>

@@ -1,0 +1,16 @@
+# Indoor: 5 runs of tare.
+# Run order = entry order; repeats within an entry are consecutive.
+
+output_dir: dev_visualization/experiments
+
+termination:
+  stuck_window_s: 20.0
+  stuck_dist_m: 2.5
+  warmup_s: 30.0
+  odom_silence_s: 5.0
+
+runs:
+  - baseline: tare
+    world: indoor
+    repeats: 5
+    max_time_s: 700
