@@ -1,5 +1,7 @@
 # Adaptive Exploration via Probabilistic Planning and Online Map Prediction
 
+[English](README.md) | [中文](README-zh.md)
+
 Two methods:
 - **ExPro**: probabilistic planning over an FPUnet map prediction.
 - **AdExPro**: ExPro plus online self-supervised adaptation of the predictor.
