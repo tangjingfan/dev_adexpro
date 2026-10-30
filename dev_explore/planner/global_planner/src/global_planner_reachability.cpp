@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 #include <future>
 #include <limits>
@@ -102,6 +103,62 @@ ReachabilityData GlobalPlanner::computeReachability(
   const bool useConfidenceGate =
       static_cast<int>(confidence_.data.size()) == predWidth * predHeight;
 
+  // Inflated-obstacle mask (see reachabilityInflationCells_): a square max
+  // filter over the obstacle cells, done as a row pass then a column pass.
+  std::vector<char> inflated;
+  const int inflation = reachabilityInflationCells_;
+  if (inflation > 0) {
+    std::vector<char> obstacle(mapSize, 0);
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int index = y * width + x;
+        const int8_t visibleValue = visible.data[index];
+        if (visibleValue >= occupiedCellThreshold_) {
+          obstacle[index] = 1;
+        } else if (visibleValue == -1) {
+          const int predX = x + expX;
+          const int predY = y + expY;
+          if (predX >= 0 && predX < predWidth && predY >= 0 && predY < predHeight &&
+              predicted.data[predY * predWidth + predX] >= predictedTraversableThreshold_) {
+            obstacle[index] = 1;
+          }
+        }
+      }
+    }
+    std::vector<char> rows(mapSize, 0);
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        if (!obstacle[y * width + x]) continue;
+        for (int nx = std::max(0, x - inflation); nx <= std::min(width - 1, x + inflation); ++nx) {
+          rows[y * width + nx] = 1;
+        }
+      }
+    }
+    inflated.assign(mapSize, 0);
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        if (!rows[y * width + x]) continue;
+        for (int ny = std::max(0, y - inflation); ny <= std::min(height - 1, y + inflation); ++ny) {
+          inflated[ny * width + x] = 1;
+        }
+      }
+    }
+  }
+  // Inflated cells outside the robot's escape zone are closed, for this BFS
+  // and (through reachability.blocked) for A*.
+  if (!inflated.empty()) {
+    reachability.blocked.assign(mapSize, 0);
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int index = y * width + x;
+        reachability.blocked[index] =
+            inflated[index] &&
+            std::max(std::abs(x - robotMapPos.x), std::abs(y - robotMapPos.y)) >
+                kReachabilityEscapeCells;
+      }
+    }
+  }
+
   reachability.visible.assign(mapSize, 0);
   reachability.predicted.assign(mapSize, 0);
   reachability.visibleDistance.assign(mapSize, -1);
@@ -156,6 +213,9 @@ ReachabilityData GlobalPlanner::computeReachability(
       }
 
       const int nextIndex = nextY * width + nextX;
+      if (!reachability.blocked.empty() && reachability.blocked[nextIndex]) {
+        continue;
+      }
       const int8_t visibleValue = visible.data[nextIndex];
       // Predicted map uses a different (expanded) grid: convert visible (vx,vy)
       // to predicted space before indexing predicted.data.
@@ -600,6 +660,13 @@ bool GlobalPlanner::isIndexTraversable(
   // mirroring the visible>0 hard-block below. Without this, freshly-revealed
   // free cells at the exploration edge are vetoed by the stale predicted map,
   // isolating local-frontier vertices and breaking the RPV local plan.
+  // Cells closed by the obstacle inflation are off-limits whatever the maps
+  // say, exactly as in computeReachability, so A* never threads a gap the
+  // reachability BFS (and hence frontier selection) treated as closed.
+  if (!ctx.reachability.blocked.empty() && ctx.reachability.blocked[index]) {
+    return false;
+  }
+
   if (index < static_cast<int>(ctx.visibleMap.data.size()) &&
       ctx.visibleMap.data[index] == 0) {
     return true;

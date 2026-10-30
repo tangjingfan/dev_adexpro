@@ -11,6 +11,8 @@
 
   <node pkg="waypoint_bridge" exec="waypoint_bridge" name="waypoint_bridge" output="screen">
     <param from="$(find-pkg-share waypoint_bridge)/config/waypoint_bridge.yaml" />
+    <!-- Same hard gate as coarse_planner.yaml's reachability_inflation_cells. -->
+    <param name="inflation_cells" value="1" />
     <param name="lookahead_distance" value="1.5" />
     <param name="reach_threshold" value="1.0" />
     <param name="preferred_clearance_cells" value="5.0" />

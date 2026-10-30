@@ -10,6 +10,9 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <map>
+#include <set>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -334,16 +337,134 @@ std::vector<Point2D> GlobalPlanner::getClusteredPredictedFrontiers(
     }
   }
 
-  if (predictedRegionGrouping_) {
-    return groupPredictedRegions(
-        traversableFrontiers,
-        static_cast<int>(visible.info.width),
-        static_cast<int>(visible.info.height),
-        reachability);
+  switch (predictedFrontierMode_) {
+    case PredictedFrontierMode::Region:
+      return groupPredictedRegions(
+          traversableFrontiers,
+          static_cast<int>(visible.info.width),
+          static_cast<int>(visible.info.height),
+          reachability);
+    case PredictedFrontierMode::Tile:
+      return tilePredictedFrontiers(traversableFrontiers, visible);
+    case PredictedFrontierMode::Poisson:
+      break;
   }
-
   return FindNearest::downsampleFrontiers(
       traversableFrontiers, globalClusterSize_, globalMinMarginalGain_);
+}
+
+PredictedTile GlobalPlanner::predictedTileOf(
+    int x, int y, const nav_msgs::msg::OccupancyGrid& map
+) const {
+  // The lattice is anchored at the world origin, not the map's, so a tile
+  // keeps its place (and its vertex stays put) as the map grows.
+  const double resolution = map.info.resolution;
+  const double worldX = map.info.origin.position.x + (x + 0.5) * resolution;
+  const double worldY = map.info.origin.position.y + (y + 0.5) * resolution;
+  return {static_cast<int>(std::floor(worldX / predictedTileSizeM_)),
+          static_cast<int>(std::floor(worldY / predictedTileSizeM_))};
+}
+
+std::vector<Point2D> GlobalPlanner::tilePredictedFrontiers(
+    const std::vector<Point2D>& candidates,
+    const nav_msgs::msg::OccupancyGrid& map
+) const {
+  struct TileCells {
+    int count{0};
+    double probSum{0.0};
+    double bestSq{std::numeric_limits<double>::max()};
+    int bestX{0};
+    int bestY{0};
+  };
+  std::map<PredictedTile, TileCells> tiles;
+
+  const double resolution = map.info.resolution;
+  const double originX = map.info.origin.position.x;
+  const double originY = map.info.origin.position.y;
+  const double size = predictedTileSizeM_;
+  for (const auto& c : candidates) {
+    const PredictedTile tile = predictedTileOf(c.x, c.y, map);
+    const double dx = originX + (c.x + 0.5) * resolution - (tile.kx + 0.5) * size;
+    const double dy = originY + (c.y + 0.5) * resolution - (tile.ky + 0.5) * size;
+    auto& cells = tiles[tile];
+    ++cells.count;
+    cells.probSum += c.prob;
+    if (dx * dx + dy * dy < cells.bestSq) {
+      cells.bestSq = dx * dx + dy * dy;
+      cells.bestX = c.x;
+      cells.bestY = c.y;
+    }
+  }
+
+  const double cellsPerSide = size / resolution;
+  const double minCells = predictedTileMinFraction_ * cellsPerSide * cellsPerSide;
+  std::vector<Point2D> vertices;
+  int sparse = 0;
+  for (const auto& [tile, cells] : tiles) {
+    if (cells.count < minCells) {
+      ++sparse;
+      continue;
+    }
+    vertices.emplace_back(cells.bestX, cells.bestY, cells.probSum / cells.count);
+  }
+
+  RCLCPP_INFO(
+      get_logger(),
+      "Predicted tiles: %zu cells -> %zu tiles of %.1f m (%d below %.0f%% filled)",
+      candidates.size(), vertices.size(), size, sparse, predictedTileMinFraction_ * 100.0);
+  return vertices;
+}
+
+void GlobalPlanner::publishPredictedTiles(
+    const std::vector<PredictedTile>& local,
+    const std::vector<PredictedTile>& pool,
+    const std::vector<PredictedTile>& suppressed
+) const {
+  visualization_msgs::msg::MarkerArray markers;
+  visualization_msgs::msg::Marker clear;
+  clear.action = visualization_msgs::msg::Marker::DELETEALL;
+  markers.markers.push_back(clear);
+
+  const auto stamp = now();
+  const double size = predictedTileSizeM_;
+  auto outlines = [&](const std::vector<PredictedTile>& tiles, const char* ns, double width,
+                      double z, float r, float g, float b, float a) {
+    if (tiles.empty()) return;
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = "map";
+    marker.header.stamp = stamp;
+    marker.ns = ns;
+    marker.id = static_cast<int>(markers.markers.size());
+    marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.pose.orientation.w = 1.0;
+    marker.scale.x = width;
+    marker.color.r = r;
+    marker.color.g = g;
+    marker.color.b = b;
+    marker.color.a = a;
+    for (const auto& tile : tiles) {
+      const double x0 = tile.kx * size, y0 = tile.ky * size;
+      const double xs[4] = {x0, x0 + size, x0 + size, x0};
+      const double ys[4] = {y0, y0, y0 + size, y0 + size};
+      for (int i = 0; i < 4; ++i) {
+        geometry_msgs::msg::Point p, q;
+        p.x = xs[i];
+        p.y = ys[i];
+        q.x = xs[(i + 1) % 4];
+        q.y = ys[(i + 1) % 4];
+        p.z = q.z = z;
+        marker.points.push_back(p);
+        marker.points.push_back(q);
+      }
+    }
+    markers.markers.push_back(marker);
+  };
+  // Drawn bottom to top, so a local tile's outline wins on shared edges.
+  outlines(suppressed, "suppressed_tiles", 0.08, 0.20, 0.6f, 0.6f, 0.6f, 0.6f);
+  outlines(pool, "pool_tiles", 0.08, 0.21, 0.35f, 0.65f, 1.0f, 0.8f);
+  outlines(local, "local_tiles", 0.20, 0.22, 0.05f, 0.30f, 0.85f, 1.0f);
+  predictedTilesPub_->publish(markers);
 }
 
 bool GlobalPlanner::isPointInFreeSpace(
@@ -408,8 +529,32 @@ GlobalPlanner::classifyAndPublishFrontiers(
   const double originY = visible.info.origin.position.y;
   const double resolution = visible.info.resolution;
 
-  auto classify = [&](const std::vector<Point2D>& frontiers) {
+  // A frontier within max_range_of_local_frontiers (geodesic, cells) is a
+  // local candidate, a farther one goes to the global pool. Returns, per
+  // frontier, whether it went local, went global, or was dropped as
+  // unreachable. Local candidates are collected first and capped below.
+  enum class Placement { Local, Global, Dropped };
+  struct LocalCandidate {
+    Point2D frontier;
+    double distance;
+    bool predicted;
+    size_t index;  // into the classified vector
+  };
+  std::vector<LocalCandidate> localCandidates;
+  auto addGlobal = [&](const Point2D& frontier, double distance) {
+    globalFrontiers.push_back(frontier);
+    prob_msgs::msg::ProbPoint frontierMsg;
+    frontierMsg.point.point.x = originX + (frontier.x + 0.5) * resolution;
+    frontierMsg.point.point.y = originY + (frontier.y + 0.5) * resolution;
+    frontierMsg.prob = frontier.prob;
+    frontierMsg.dist = distance;
+    globalFrontierMsg.points.push_back(frontierMsg);
+  };
+  auto classify = [&](const std::vector<Point2D>& frontiers, bool predictedSource) {
+    std::vector<Placement> placements;
+    placements.reserve(frontiers.size());
     for (const auto& frontier : frontiers) {
+      placements.push_back(Placement::Dropped);
       const int index = frontier.y * width + frontier.x;
       if (distanceMap[index] == std::numeric_limits<double>::max()) {
         continue;
@@ -422,18 +567,16 @@ GlobalPlanner::classifyAndPublishFrontiers(
       }
 
       if (distanceMap[index] <= maxRangeOfLocalFrontiers_) {
-        localFrontiers.push_back(frontier);
+        placements.back() = Placement::Local;
+        localCandidates.push_back(
+            {frontier, distanceMap[index], predictedSource, placements.size() - 1});
         continue;
       }
 
-      globalFrontiers.push_back(frontier);
-      prob_msgs::msg::ProbPoint frontierMsg;
-      frontierMsg.point.point.x = worldX;
-      frontierMsg.point.point.y = worldY;
-      frontierMsg.prob = frontier.prob;
-      frontierMsg.dist = distanceMap[index];
-      globalFrontierMsg.points.push_back(frontierMsg);
+      placements.back() = Placement::Global;
+      addGlobal(frontier, distanceMap[index]);
     }
+    return placements;
   };
 
   // The two extraction pipelines are thinned independently — map edges at
@@ -449,7 +592,25 @@ GlobalPlanner::classifyAndPublishFrontiers(
   };
   std::vector<Point2D> separatedPredicted;
   int suppressed = 0;
-  if (crossSourceMinSeparationCells_ > 0.0) {
+  const bool tileMode = predictedFrontierMode_ == PredictedFrontierMode::Tile;
+  std::vector<PredictedTile> suppressedTiles;
+  if (tileMode) {
+    // A tile that already holds a map-edge frontier is represented by it, so
+    // the tile's predicted vertex is dropped.
+    std::set<PredictedTile> mapEdgeTiles;
+    for (const auto& mapEdge : mapEdges) {
+      mapEdgeTiles.insert(predictedTileOf(mapEdge.x, mapEdge.y, visible));
+    }
+    for (const auto& predictedFrontier : predictedFrontiers) {
+      const PredictedTile tile = predictedTileOf(predictedFrontier.x, predictedFrontier.y, visible);
+      if (mapEdgeTiles.count(tile)) {
+        ++suppressed;
+        suppressedTiles.push_back(tile);
+        continue;
+      }
+      separatedPredicted.push_back(predictedFrontier);
+    }
+  } else if (crossSourceMinSeparationCells_ > 0.0) {
     separatedPredicted.reserve(predictedFrontiers.size());
     const double crossSq = crossSourceMinSeparationCells_ * crossSourceMinSeparationCells_;
     for (const auto& predictedFrontier : predictedFrontiers) {
@@ -489,28 +650,64 @@ GlobalPlanner::classifyAndPublishFrontiers(
   auto fmt = [](double sq) {
     return sq == std::numeric_limits<double>::max() ? -1.0 : std::sqrt(sq);
   };
+  const std::string suppressionRule =
+      predictedFrontierMode_ == PredictedFrontierMode::Tile
+          ? "sharing a tile with a map edge"
+          : "within " + std::to_string(crossSourceMinSeparationCells_) + " cells";
   RCLCPP_INFO(
       get_logger(),
       "Closest pair (cells): map_edge<->map_edge=%.1f  predicted<->predicted=%.1f  "
-      "map_edge<->predicted=%.1f  (%d predicted suppressed within %.1f)",
+      "map_edge<->predicted=%.1f  (%d predicted suppressed %s)",
       fmt(closestWithinSq(mapEdges)), fmt(closestWithinSq(predictedFrontiers)),
-      fmt(closestCrossSq), suppressed, crossSourceMinSeparationCells_
+      fmt(closestCrossSq), suppressed, suppressionRule.c_str()
   );
 
-  classify(mapEdges);
-  const size_t mapEdgeLocal = localFrontiers.size();
+  classify(mapEdges, false);
   const size_t mapEdgeGlobal = globalFrontiers.size();
-  classify(separatedPredicted);
+  auto predictedPlacements = classify(separatedPredicted, true);
 
-  // The RPV solver is exponential in vertex count and only the *global* set is
-  // capped (max_frontiers_to_plan); the local set goes in whole. Log the split
-  // so an overlong local list is visible before it shows up as a solver timeout.
+  // Local cap: map-edge and predicted candidates compete on geodesic distance
+  // alone; the nearest max_local_frontiers_to_plan go to the RPV, the rest to
+  // the global pool. The RPV is exponential in vertex count, and the robot
+  // only executes the first hop before replanning, so ordering far-away
+  // vertices exactly buys nothing.
+  std::stable_sort(localCandidates.begin(), localCandidates.end(),
+                   [](const LocalCandidate& a, const LocalCandidate& b) {
+                     return a.distance < b.distance;
+                   });
+  size_t mapEdgeLocal = 0;
+  size_t overflow = 0;
+  for (size_t i = 0; i < localCandidates.size(); ++i) {
+    const auto& c = localCandidates[i];
+    if (maxLocalFrontiersToPlan_ > 0 && i >= static_cast<size_t>(maxLocalFrontiersToPlan_)) {
+      ++overflow;
+      addGlobal(c.frontier, c.distance);
+      if (c.predicted) predictedPlacements[c.index] = Placement::Global;
+      continue;
+    }
+    localFrontiers.push_back(c.frontier);
+    if (!c.predicted) ++mapEdgeLocal;
+  }
+
+  if (tileMode) {
+    std::vector<PredictedTile> localTiles;
+    std::vector<PredictedTile> poolTiles;
+    for (size_t i = 0; i < separatedPredicted.size(); ++i) {
+      const PredictedTile tile =
+          predictedTileOf(separatedPredicted[i].x, separatedPredicted[i].y, visible);
+      (predictedPlacements[i] == Placement::Local ? localTiles : poolTiles).push_back(tile);
+    }
+    publishPredictedTiles(localTiles, poolTiles, suppressedTiles);
+  }
+
+  // Log the split so an overlong local list is visible before it shows up as
+  // a solver timeout. global's map_edge count excludes local overflow.
   RCLCPP_INFO(
       get_logger(),
-      "Frontiers: local=%zu (map_edge=%zu predicted=%zu)  global=%zu "
-      "(map_edge=%zu predicted=%zu)",
-      localFrontiers.size(), mapEdgeLocal, localFrontiers.size() - mapEdgeLocal,
-      globalFrontiers.size(), mapEdgeGlobal, globalFrontiers.size() - mapEdgeGlobal
+      "Frontiers: local=%zu (map_edge=%zu predicted=%zu, %zu more beyond the cap of %d)  "
+      "global=%zu (beyond range: map_edge=%zu)",
+      localFrontiers.size(), mapEdgeLocal, localFrontiers.size() - mapEdgeLocal, overflow,
+      maxLocalFrontiersToPlan_, globalFrontiers.size(), mapEdgeGlobal
   );
 
   globalFrontierMsg.header.stamp = now();

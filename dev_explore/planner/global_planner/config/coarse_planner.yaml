@@ -20,42 +20,47 @@ global_planner_node:
     global_cluster_size: 60 # cells
     local_min_marginal_gain: 2
     global_min_marginal_gain: 2
-    # NOTE: max_frontiers_to_plan caps the GLOBAL vertex set only
-    # (buildGlobalPlanningVertices). The local set goes into the solver whole,
-    # and the RPV search is exponential in vertex count — watch the "RPV: N
-    # vertices -> T ms" log line, and note that a timeout which finds no
-    # complete tour fails the plan outright rather than degrading.
+    # The RPV search is exponential in vertex count, so both vertex sets are
+    # capped. max_frontiers_to_plan caps the global set
+    # (buildGlobalPlanningVertices). max_local_frontiers_to_plan caps the local
+    # set: of the frontiers within max_range_of_local_frontiers (geodesic),
+    # map-edge and predicted alike, the nearest this many go to the local RPV
+    # and the rest to the global pool. 0 = no local cap. Watch the "RPV: N
+    # vertices -> T ms" log line.
     max_frontiers_to_plan: 20
+    max_local_frontiers_to_plan: 20
     range_threshold_global_frontier: 6.0
 
-    # Predicted-region grouping. findPredictedSpaceFrontiers accepts every
-    # predicted-free cell the robot hasn't observed — the interior of a
-    # predicted room included — so what comes out is a sampling of predicted
-    # AREA, not a set of boundaries. Grouping collapses those cells into one
-    # vertex per connected predicted region, positioned at the region's
-    # entrance (the member reached first through predicted space) and carrying
-    # the region's mean confidence as its existence probability.
-    #
-    # Versus the Poisson thinning it replaces: the representative is meaningful
-    # and stable rather than whichever cell the thinning happened to keep, the
-    # probability is averaged rather than one cell's possibly-noisy value, and
-    # a single connected space stops being split into several vertices by a
-    # radius that has to be retuned per resolution and scene.
-    #
-    # OFF for now: in sim it left too few predicted vertices, and putting each
-    # region's single vertex at its entrance placed it right on top of the
-    # map-edge frontier for the same opening. Kept for A/B — the grouping
-    # semantics (stable representative, averaged probability, no arbitrary
-    # radius) are still the better story if the count issue can be addressed,
-    # e.g. by emitting several vertices for a large region instead of one.
-    predicted_region_grouping: false
-    # Regions smaller than this are dropped as prediction noise rather than
-    # promoted to a planning target. Only used when grouping is on.
+    # How predicted-space candidates become planning vertices. The candidates
+    # (findPredictedSpaceFrontiers) are every predicted-free cell the robot has
+    # not seen, the interior of a predicted room included: a sampling of
+    # predicted AREA, not a set of boundaries.
+    #   poisson: Poisson thinning at global_cluster_size. Keeps whichever cell
+    #            the row-major scan reaches first, so vertices sit at arbitrary
+    #            corners and move as the map grows.
+    #   region:  one vertex per connected predicted region, at its entrance.
+    #            Too few vertices, and the entrance lands on the map-edge
+    #            frontier of the same opening.
+    #   tile:    TARE-style. World-anchored square tiles of
+    #            predicted_tile_size_m cover all predicted space. A tile whose
+    #            candidate cells fill at least predicted_tile_min_fraction of it
+    #            becomes one vertex, at the candidate nearest its center, with
+    #            their mean confidence. A tile that already holds a map-edge
+    #            frontier is left to that frontier (cross_source_min_separation_cells
+    #            is then unused). Like map-edge frontiers, a tile vertex
+    #            within max_range_of_local_frontiers (geodesic) joins the local
+    #            RPV set, a farther one the global pool. Tiles are drawn on
+    #            /predicted_tiles:
+    #            dark blue = local set, light blue = global pool, gray = suppressed.
+    predicted_frontier_mode: tile
+    predicted_tile_size_m: 4.0
+    predicted_tile_min_fraction: 0.1
+    # region mode only: regions smaller than this are dropped as noise.
     predicted_region_min_cells: 20
 
-    # Minimum separation (cells) between a predicted frontier and a map-edge
-    # one. The two extraction pipelines are thinned independently — map edges
-    # at local_cluster_size, predicted at global_cluster_size — so nothing
+    # poisson/region modes: minimum separation (cells) between a predicted
+    # frontier and a map-edge one. The two extraction pipelines are thinned
+    # independently — map edges at local_cluster_size, predicted at global_cluster_size — so nothing
     # otherwise stops a predicted representative from landing on top of a
     # map-edge one, describing the same opening twice and spending two solver
     # vertices on it. The map-edge copy wins (it is the certain one, p = 1).
@@ -125,6 +130,16 @@ global_planner_node:
     # pinch stay explorable); a genuine long narrow tunnel exceeds it and is
     # discarded. Raise to tolerate longer narrow stretches.
     clearance_tight_cell_budget: 10
+    # Reachability BFS obstacle inflation (cells, square kernel). Obstacles
+    # (visible, or predicted where the visible map is unknown) are grown by this
+    # much and the BFS may not enter the grown cells, so a passage narrower than
+    # 2 * inflation + 1 cells is unreachable: with 1, a one-cell-wide gap (and a
+    # two-cell one) no longer connects. The same closed cells are off-limits to
+    # the planner's A* (distance matrix and paths), so BFS and A* agree on what
+    # is traversable: frontiers and predicted tiles behind such a gap are not
+    # candidates, and geodesic distances and RPV edge costs route around it.
+    # Cells within 3 of the robot stay open so it can leave a wall. 0 disables.
+    reachability_inflation_cells: 1
     occupied_cell_threshold: 50
 
     # Predicted map

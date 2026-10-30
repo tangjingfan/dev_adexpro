@@ -16,6 +16,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 include_directories(include)
 
@@ -46,6 +47,7 @@ ament_target_dependencies(global_planner_node
   std_msgs
   tf2
   tf2_geometry_msgs
+  visualization_msgs
 )
 
 install(TARGETS

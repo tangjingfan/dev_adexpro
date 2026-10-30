@@ -14,6 +14,7 @@
 #include "sensor_msgs/point_cloud2_iterator.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 
 #include <array>
 #include <atomic>
@@ -57,6 +58,24 @@ struct Vertex {
   double probability{0.0};
 };
 
+// How predicted-space candidate cells become planning vertices (see
+// getClusteredPredictedFrontiers).
+enum class PredictedFrontierMode {
+  Poisson,  // Poisson-disk thinning at global_cluster_size
+  Region,   // one vertex per connected predicted region (groupPredictedRegions)
+  Tile,     // one vertex per world-anchored tile, TARE-style (tilePredictedFrontiers)
+};
+
+// A world-anchored square tile of the predicted-frontier lattice.
+struct PredictedTile {
+  int kx{0};
+  int ky{0};
+
+  bool operator<(const PredictedTile &other) const {
+    return (kx != other.kx) ? (kx < other.kx) : (ky < other.ky);
+  }
+};
+
 struct FrontierTask {
   prob_msgs::msg::ProbPoint msgPoint{};
   Vertex vertex{};
@@ -68,6 +87,10 @@ struct ReachabilityData {
   std::vector<char> predicted{};
   std::vector<int> visibleDistance{};
   std::vector<int> predictedDistance{};
+  // Cells closed by the obstacle inflation (reachability_inflation_cells),
+  // outside the robot's escape zone. Shared by the BFS and A* so both agree on
+  // what is traversable. Empty when inflation is off.
+  std::vector<char> blocked{};
   // Flat index of the robot's cell; -1 when it lies off the grid. Set even if
   // that cell is not free (the BFS then seeds nothing).
   int robotIndex{-1};
@@ -198,6 +221,23 @@ private:
       const std::vector<Point2D> &candidates,
       int width, int height,
       const ReachabilityData &reachability) const;
+  // One vertex per tile holding enough candidate cells, TARE-style: the
+  // candidates are the predicted-free cells the robot has not seen, so a tile
+  // with many of them is unexplored predicted space. The vertex is the member
+  // nearest the tile's center (the center itself may be a wall or unreachable)
+  // and carries the members' mean confidence.
+  std::vector<Point2D> tilePredictedFrontiers(
+      const std::vector<Point2D> &candidates,
+      const nav_msgs::msg::OccupancyGrid &map) const;
+  // Tile holding cell (x, y) of `map`.
+  PredictedTile predictedTileOf(
+      int x, int y, const nav_msgs::msg::OccupancyGrid &map) const;
+  // Tile outlines on /predicted_tiles: tiles whose vertex is in the local RPV
+  // set, tiles left to the global pool, and tiles suppressed by a map edge.
+  void publishPredictedTiles(
+      const std::vector<PredictedTile> &local,
+      const std::vector<PredictedTile> &pool,
+      const std::vector<PredictedTile> &suppressed) const;
   std::vector<Vertex> prepareLocalPlanningVertices(
       const PlanningContext &ctx) const;
   std::vector<FrontierTask> collectGlobalPlanningTasks(
@@ -290,6 +330,7 @@ private:
   PointCloud2PublisherPtr globalFrontierPub_{};
   PointCloud2PublisherPtr mapEdgeFrontierPub_{};
   PointCloud2PublisherPtr predictedFrontierPub_{};
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr predictedTilesPub_{};
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr paddedMapPub_{};
   ProbPointVecPublisherPtr globalFrontiersProbPub_{};
   PlanningStatsPublisherPtr planningStatsPub_{};
@@ -346,6 +387,9 @@ private:
   double turnCostFactor_{0.0};
   double rangeThresholdGlobalFrontier_{0.0};
   int maxFrontiersToPlan_{20};
+  // Cap on the local RPV set: the nearest (geodesic) this many local frontiers,
+  // map-edge and predicted alike; the rest go to the global pool. 0 = no cap.
+  int maxLocalFrontiersToPlan_{0};
   double planningTimeLimit_{1.0};
   int distanceMatrixWorkerCount_{0};
   int distanceMatrixParallelMinVertices_{8};
@@ -396,12 +440,22 @@ private:
   std::optional<std::pair<double, double>> lastCommittedTarget_{};
   mutable std::atomic<unsigned long long> softCommitmentHits_{0};
 
-  // Predicted-region grouping (see groupPredictedRegions). false uses Poisson
-  // thinning instead — currently the default, since grouping put each region's
-  // single vertex at its entrance, i.e. right on top of the map-edge frontier
-  // for the same opening, and left too few predicted vertices overall.
-  bool predictedRegionGrouping_{false};
+  // How predicted candidates become vertices (predicted_frontier_mode).
+  PredictedFrontierMode predictedFrontierMode_{PredictedFrontierMode::Poisson};
+  // Region mode: regions smaller than this are dropped as noise.
   int predictedRegionMinCells_{20};
+  // Obstacles (visible, or predicted where the visible map is unknown) are
+  // inflated by this many cells (square kernel) before the reachability BFS,
+  // which may not enter inflated cells: a passage narrower than
+  // 2 * inflation + 1 cells is not traversable. 0 disables. Inflated cells
+  // within kReachabilityEscapeCells of the robot stay open so it can leave a
+  // wall it is standing next to.
+  int reachabilityInflationCells_{0};
+  static constexpr int kReachabilityEscapeCells = 3;
+  // Tile mode: tile edge (m) and the share of a tile's cells that must be
+  // candidates for it to become a vertex.
+  double predictedTileSizeM_{4.0};
+  double predictedTileMinFraction_{0.1};
   // Minimum separation (cells) between a predicted frontier and a map-edge
   // one. The two pipelines are thinned independently, so without this they can
   // coincide. 0 disables.

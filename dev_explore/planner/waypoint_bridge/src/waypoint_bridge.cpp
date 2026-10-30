@@ -9,6 +9,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <queue>
 #include <vector>
@@ -27,6 +28,12 @@ struct PlanContext {
   // visible obstacle zone.  nullptr when visible_map hasn't been received yet
   // (then visibility gating is skipped).
   const std::vector<uint8_t>* visibleBlocked;
+  // inflated[i] == true: within inflation_cells (square kernel) of an obstacle
+  // (a blocked cell above, or grid >= occupiedThreshold). A* may not enter such
+  // cells except near its start and goal — the same rule as global_planner's
+  // reachability_inflation_cells, so the bridge never threads a gap the
+  // planner treated as closed. nullptr when inflation is off.
+  const std::vector<uint8_t>* inflated;
   int     occupiedThreshold;
   double  confidenceThreshold;
 };
@@ -48,6 +55,41 @@ static inline bool isCellFree(const PlanContext& ctx, int index) {
   }
   if (ctx.visibleBlocked != nullptr && (*ctx.visibleBlocked)[index]) return false;
   return true;
+}
+
+// Cells within this many cells (Chebyshev) of the A* start or goal ignore the
+// inflation, so the robot can leave a wall and reach a waypoint beside one.
+// Matches global_planner's kReachabilityEscapeCells.
+constexpr int kInflationEscapeCells = 3;
+
+// Square-kernel dilation of the obstacle cells (see PlanContext::inflated),
+// as a row pass then a column pass.
+static std::vector<uint8_t> computeInflatedMask(const PlanContext& ctx, int inflation) {
+  const int W = static_cast<int>(ctx.grid->info.width);
+  const int H = static_cast<int>(ctx.grid->info.height);
+  std::vector<uint8_t> rows(W * H, 0);
+  for (int y = 0; y < H; ++y) {
+    for (int x = 0; x < W; ++x) {
+      const int i = y * W + x;
+      const bool obstacle =
+          ctx.grid->data[i] >= static_cast<int8_t>(ctx.occupiedThreshold) ||
+          (ctx.visibleBlocked != nullptr && (*ctx.visibleBlocked)[i]);
+      if (!obstacle) continue;
+      for (int nx = std::max(0, x - inflation); nx <= std::min(W - 1, x + inflation); ++nx) {
+        rows[y * W + nx] = 1;
+      }
+    }
+  }
+  std::vector<uint8_t> inflated(W * H, 0);
+  for (int y = 0; y < H; ++y) {
+    for (int x = 0; x < W; ++x) {
+      if (!rows[y * W + x]) continue;
+      for (int ny = std::max(0, y - inflation); ny <= std::min(H - 1, y + inflation); ++ny) {
+        inflated[ny * W + x] = 1;
+      }
+    }
+  }
+  return inflated;
 }
 
 static std::vector<float> computeClearanceMap(const PlanContext& ctx) {
@@ -115,19 +157,11 @@ struct DirectionBias {
 
 // Returns the A* path (start → goal) as grid cells, or empty if unreachable.
 //
-// NOTE on corridor width: this A* only applies a *soft* clearance preference
-// (preferredClearanceCells / clearancePenaltyWeight) — it has no *hard*
-// minimum-corridor-width gate. That hard gate deliberately lives in
-// global_planner (isIndexTraversable + computeObstacleClearance), so the
-// exploration planner never selects frontiers reachable only through passages
-// too narrow for the robot. The bridge then trusts /solution_path. Residual
-// gap: the bridge still re-plans its own fine route to a (legitimately
-// reachable) waypoint, so if a *shorter* narrow shortcut exists it could take
-// it. Unlikely in practice (diagonal corner-cutting is already forbidden below
-// and the global solution routes around narrow regions), but if you ever see
-// this A* threading a sub-robot-width gap, port the global planner's clearance
-// gate here: compute an obstacle-only clearance map and skip cells whose
-// clearance < min_clearance_cells (mirror of global_planner_reachability.cpp).
+// NOTE on corridor width: besides the *soft* clearance preference
+// (preferredClearanceCells / clearancePenaltyWeight), the hard gate is the
+// obstacle inflation (ctx.inflated, inflation_cells): with it on, this A*
+// cannot take a narrow shortcut the global planner's BFS and A* treat as
+// closed. With inflation_cells = 0 there is no hard minimum-width gate.
 static std::vector<Cell> astarPath(
   const PlanContext& ctx,
   const Cell& start, const Cell& goal,
@@ -180,6 +214,11 @@ static std::vector<Cell> astarPath(
       if (!inBounds(nx, ny)) continue;
       const int ni = toIdx(nx, ny);
       if (!isCellFree(ctx, ni)) continue;
+      if (ctx.inflated != nullptr && (*ctx.inflated)[ni] &&
+          std::max(std::abs(nx - start.x), std::abs(ny - start.y)) > kInflationEscapeCells &&
+          std::max(std::abs(nx - goal.x), std::abs(ny - goal.y)) > kInflationEscapeCells) {
+        continue;
+      }
       // Forbid diagonal corner-cutting: a diagonal step squeezes between the
       // two orthogonally-adjacent cells, so require BOTH of them to be free.
       // Otherwise the center-to-center segment clips the corner of a hard-
@@ -249,6 +288,7 @@ public:
     declare_parameter("reach_threshold", 1.5);
     declare_parameter("occupied_threshold", 50);
     declare_parameter("astar_max_nodes", 5000);
+    declare_parameter("inflation_cells", 0);
     declare_parameter("preferred_clearance_cells", 3.0);
     declare_parameter("clearance_penalty_weight", 1.0);
     declare_parameter("publish_rate", 5.0);
@@ -261,6 +301,7 @@ public:
     reachThreshold_          = get_parameter("reach_threshold").as_double();
     occupiedThreshold_       = get_parameter("occupied_threshold").as_int();
     astarMaxNodes_           = get_parameter("astar_max_nodes").as_int();
+    inflationCells_          = std::max(0, static_cast<int>(get_parameter("inflation_cells").as_int()));
     preferredClearanceCells_ = get_parameter("preferred_clearance_cells").as_double();
     clearancePenaltyWeight_  = get_parameter("clearance_penalty_weight").as_double();
     confidenceThreshold_     = get_parameter("confidence_threshold").as_double();
@@ -496,6 +537,11 @@ private:
       hasMovementDir_, movementDirX_, movementDirY_,
       directionBiasWeight_, directionBiasRangeCells_};
 
+    std::vector<uint8_t> inflated;
+    if (inflationCells_ > 0) {
+      inflated = computeInflatedMask(ctx, inflationCells_);
+      ctx.inflated = &inflated;
+    }
     const auto clearanceMap = computeClearanceMap(ctx);
     std::vector<Cell> astar;
     while (targetIndex < static_cast<int>(path_.poses.size())) {
@@ -630,6 +676,7 @@ private:
   double reachThreshold_{1.5};
   int    occupiedThreshold_{50};
   int    astarMaxNodes_{5000};
+  int    inflationCells_{0};
   double preferredClearanceCells_{3.0};
   double clearancePenaltyWeight_{1.0};
   double confidenceThreshold_{0.5};

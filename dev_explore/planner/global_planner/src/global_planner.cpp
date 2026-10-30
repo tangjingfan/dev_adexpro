@@ -54,6 +54,7 @@ void GlobalPlanner::declareParameters() {
   declare_parameter("turn_cost_factor", 2.0);
   declare_parameter("range_threshold_global_frontier", 6.0);
   declare_parameter("max_frontiers_to_plan", 20);
+  declare_parameter("max_local_frontiers_to_plan", 0);
   declare_parameter("planning_time_limit", 1.0);
   declare_parameter("exploration_enabled_topic", "/exploration_enabled");
   declare_parameter("exploration_enabled_initial", true);
@@ -73,8 +74,11 @@ void GlobalPlanner::declareParameters() {
   declare_parameter("local_hysteresis_match_radius", 1.5);
   declare_parameter("global_guide_enabled", true);
   declare_parameter("global_guide_period", 3);
-  declare_parameter("predicted_region_grouping", false);
+  declare_parameter("predicted_frontier_mode", "poisson");
   declare_parameter("predicted_region_min_cells", 20);
+  declare_parameter("reachability_inflation_cells", 0);
+  declare_parameter("predicted_tile_size_m", 4.0);
+  declare_parameter("predicted_tile_min_fraction", 0.1);
   declare_parameter("cross_source_min_separation_cells", 5.0);
   declare_parameter("predicted_edge_inflation_alpha", 0.0);
 }
@@ -94,6 +98,7 @@ void GlobalPlanner::loadParameters() {
   turnCostFactor_                    = get_parameter("turn_cost_factor").as_double();
   rangeThresholdGlobalFrontier_      = get_parameter("range_threshold_global_frontier").as_double();
   maxFrontiersToPlan_                = get_parameter("max_frontiers_to_plan").as_int();
+  maxLocalFrontiersToPlan_           = std::max(0, static_cast<int>(get_parameter("max_local_frontiers_to_plan").as_int()));
   planningTimeLimit_                 = get_parameter("planning_time_limit").as_double();
   explorationEnabledTopic_           = get_parameter("exploration_enabled_topic").as_string();
   explorationEnabledInitial_         = get_parameter("exploration_enabled_initial").as_bool();
@@ -114,8 +119,22 @@ void GlobalPlanner::loadParameters() {
   localHysteresisMatchRadius_        = get_parameter("local_hysteresis_match_radius").as_double();
   globalGuideEnabled_                = get_parameter("global_guide_enabled").as_bool();
   globalGuidePeriod_                 = std::max(1, static_cast<int>(get_parameter("global_guide_period").as_int()));
-  predictedRegionGrouping_           = get_parameter("predicted_region_grouping").as_bool();
+  const auto predictedMode           = get_parameter("predicted_frontier_mode").as_string();
+  if (predictedMode == "tile") {
+    predictedFrontierMode_ = PredictedFrontierMode::Tile;
+  } else if (predictedMode == "region") {
+    predictedFrontierMode_ = PredictedFrontierMode::Region;
+  } else {
+    if (predictedMode != "poisson") {
+      RCLCPP_WARN(get_logger(), "Unknown predicted_frontier_mode '%s', using poisson",
+                  predictedMode.c_str());
+    }
+    predictedFrontierMode_ = PredictedFrontierMode::Poisson;
+  }
   predictedRegionMinCells_           = static_cast<int>(get_parameter("predicted_region_min_cells").as_int());
+  reachabilityInflationCells_        = std::max(0, static_cast<int>(get_parameter("reachability_inflation_cells").as_int()));
+  predictedTileSizeM_                = get_parameter("predicted_tile_size_m").as_double();
+  predictedTileMinFraction_          = get_parameter("predicted_tile_min_fraction").as_double();
   crossSourceMinSeparationCells_     = get_parameter("cross_source_min_separation_cells").as_double();
   predictedEdgeInflationAlpha_       = get_parameter("predicted_edge_inflation_alpha").as_double();
 }
@@ -139,6 +158,7 @@ void GlobalPlanner::initializePublishers() {
   globalFrontierPub_      = create_publisher<sensor_msgs::msg::PointCloud2>("/global_frontiers", 10);
   mapEdgeFrontierPub_     = create_publisher<sensor_msgs::msg::PointCloud2>("/map_edge_frontiers", 10);
   predictedFrontierPub_   = create_publisher<sensor_msgs::msg::PointCloud2>("/predicted_frontiers", 10);
+  predictedTilesPub_      = create_publisher<visualization_msgs::msg::MarkerArray>("/predicted_tiles", 10);
   paddedMapPub_           = create_publisher<nav_msgs::msg::OccupancyGrid>("/padded_visible_map", 10);
   globalFrontiersProbPub_ = create_publisher<prob_msgs::msg::ProbPointVec>("/global_frontiers_prob", 10);
   planningStatsPub_       = create_publisher<rpv_msgs::msg::PlanningStats>("/global_planner_stats", rclcpp::QoS(1));
