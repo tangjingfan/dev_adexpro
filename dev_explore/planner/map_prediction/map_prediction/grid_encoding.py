@@ -1,6 +1,6 @@
 """Occupancy-grid <-> model-value encoding shared by every prediction backend.
 
-Deliberately torch-free: the oracle backend needs these tables but must not pull
+Deliberately torch-free: the oexp backend needs these tables but must not pull
 in the learned model's dependencies.
 """
 

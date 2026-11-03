@@ -3,7 +3,7 @@
 <package format="3">
   <name>map_prediction</name>
   <version>0.0.0</version>
-  <description>Map prediction node with two interchangeable backends: a learned FPUnet predictor and an oracle that fills frontier local windows from a ground-truth occupancy grid.</description>
+  <description>Map prediction node with two interchangeable backends: a learned FPUnet predictor and an oexp that fills frontier local windows from a ground-truth occupancy grid.</description>
   <maintainer email="tangjingfan@gmail.com">Jingfan</maintainer>
   <license>TODO: License declaration</license>
 

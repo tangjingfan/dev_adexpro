@@ -12,10 +12,10 @@ published on the GT grid as prob_msgs/ProbGrid, all with the same stamp:
     /prediction_eval/n_eval         times each cell was scored
 prediction_heatmap draws them live.
 
-Output, under $EXPRO_EXPERIMENTS_DIR (default ./experiments):
-    runs/<EXPRO_RUN_ID>/prediction_eval/        when launched by the runner
-    prediction_eval/<method>_<world>_<stamp>/   otherwise
-holding accuracy.npz (rewritten every `save_period_s`) and cycles.csv.
+Output goes to <run folder>/prediction_eval/: accuracy.npz (rewritten every
+`save_period_s`) and cycles.csv. The run folder is $EXPRO_RUN_DIR, set by the
+start scripts and the runner, or for a node launched by hand
+$EXPRO_EXPERIMENTS_DIR (default ./experiments)/<method>/<world>/<stamp>.
 """
 
 import array
@@ -92,13 +92,13 @@ class PredictionEvalNode(Node):
         self.get_logger().info(f"Prediction eval ({self.method}, {self.world}) -> {self.out_dir}")
 
     def _resolve_out_dir(self):
-        exp = os.environ.get("EXPRO_EXPERIMENTS_DIR", "").strip() or \
-            os.path.join(os.getcwd(), "experiments")
-        run_id = os.environ.get("EXPRO_RUN_ID", "").strip()
-        if run_id:
-            return os.path.join(exp, "runs", run_id, "prediction_eval")
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return os.path.join(exp, "prediction_eval", f"{self.method}_{self.world}_{stamp}")
+        run_dir = os.environ.get("EXPRO_RUN_DIR", "").strip()
+        if not run_dir:
+            exp = os.environ.get("EXPRO_EXPERIMENTS_DIR", "").strip() or \
+                os.path.join(os.getcwd(), "experiments")
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            run_dir = os.path.join(exp, self.method, self.world, stamp)
+        return os.path.join(run_dir, "prediction_eval")
 
     # ------------------------------------------------------------------
 

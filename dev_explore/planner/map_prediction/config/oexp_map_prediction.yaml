@@ -1,4 +1,4 @@
-oracle_map_prediction_node:
+oexp_map_prediction_node:
   ros__parameters:
     prediction_cycle: 2.0
     model_input_size: 128

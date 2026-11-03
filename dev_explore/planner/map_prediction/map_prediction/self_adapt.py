@@ -574,24 +574,19 @@ class SelfAdaptNode(MapPredictionNode):
     def _resolve_online_paths(self):
         """(log_dir, train_csv, sample_csv) for this run's online logs.
 
-        Launched by the experiment runner, EXPRO_RUN_ID co-locates the trainer's
-        output with the recorder's under one self-describing run folder
-        (<EXPRO_EXPERIMENTS_DIR>/runs/<id>/online_train/), with fixed filenames —
-        no per-node stamp, because the run folder already carries the identity.
-        A hand-run node (no EXPRO_RUN_ID) keeps the old self-stamped layout so a
-        manual launch is unchanged.
+        Launched by a start script or the experiment runner, EXPRO_RUN_DIR puts
+        the trainer's output in the run's folder (<EXPRO_RUN_DIR>/online_train/),
+        with fixed filenames — no per-node stamp, because the run folder already
+        carries the identity. A node launched by hand (no EXPRO_RUN_DIR) keeps
+        the self-stamped layout.
         """
-        run_id = os.environ.get("EXPRO_RUN_ID", "").strip()
-        if run_id:
-            exp = os.environ.get("EXPRO_EXPERIMENTS_DIR", "").strip() or \
-                os.path.join(os.getcwd(), "experiments")
-            log_dir = os.path.join(exp, "runs", run_id, "online_train")
+        run_dir = os.environ.get("EXPRO_RUN_DIR", "").strip()
+        if run_dir:
+            log_dir = os.path.join(run_dir, "online_train")
             return (log_dir,
                     os.path.join(log_dir, "online_train.csv"),
                     os.path.join(log_dir, "online_samples.csv"))
-        # A relative online_log_dir is taken under the experiments dir (set by
-        # the start scripts and the runner), so the output lands in
-        # dev_results/experiments/ wherever the node was launched from.
+        # A relative online_log_dir is taken under the experiments dir, if set.
         log_dir = self.online_log_dir
         if not os.path.isabs(log_dir):
             exp = os.environ.get("EXPRO_EXPERIMENTS_DIR", "").strip() or \

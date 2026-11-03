@@ -1,7 +1,7 @@
 # dev_visualization: ROS visualization packages
 
 Built in the same colcon workspace (the repo root) as `dev_explore/`, with the system Python
-(step 1 of the build in the top-level README). Run output goes to `../dev_results/experiments/`.
+(step 1 of the build in the top-level README). Run output goes to `../dev_results/experiments/<method>/<world>/<stamp>/`.
 
 ```
 dev_visualization/
@@ -14,8 +14,7 @@ dev_visualization/
 
 Only cells that were unknown in the visible map the predictor saw, and that it filled in, are
 compared with GT. Per-cell outcome counts accumulate on the GT grid. Output goes to
-`$EXPRO_EXPERIMENTS_DIR/prediction_eval/<method>_<world>_<stamp>/` (`accuracy.npz`, rewritten every
-5 s, and `cycles.csv`). Every 2 s it publishes the per-cell results on the GT grid as
+`<run folder>/prediction_eval/` (`accuracy.npz`, rewritten every 5 s, and `cycles.csv`). Every 2 s it publishes the per-cell results on the GT grid as
 `prob_msgs/ProbGrid` (transient-local):
 
 | Topic | Per cell |
@@ -29,7 +28,7 @@ free but occupied in GT.
 
 `prediction_eval.launch world:= method:= [include_gt:=true]` starts the GT octomap
 (`gt_mapping_<world>.launch`) and the node. The experiment runner uses it for `expro`, `adexpro`
-and `oracle` runs.
+and `oexp` runs.
 
 ## prediction_heatmap
 
@@ -43,7 +42,7 @@ Cells scored fewer than `min_count` (default 3) times are hidden. Closing the wi
 prediction_eval.
 
 `prediction_heatmap.launch world:= method:=` = `prediction_eval.launch` + the window. This is what
-`scripts/start_{expro,adexpro,oracle}.sh` run in pane 4 (`EVAL=0` turns both off). By hand:
+`scripts/start_{expro,adexpro,oexp}.sh` run in pane 4 (`EVAL=0` turns both off). By hand:
 
 ```bash
 ros2 launch prediction_heatmap prediction_heatmap.launch world:=indoor method:=adexpro

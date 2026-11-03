@@ -26,7 +26,7 @@
 |----------------|-----------|
 | ExPro          | `expro`   |
 | AdExPro        | `adexpro` |
-| ExPro (oracle) | `oracle`  |
+| OExp           | `oexp`    |
 
 ## 准备
 
@@ -82,7 +82,7 @@ python -m colcon build --symlink-install --packages-select map_prediction ariadn
 #   world 默认是 garage（可选：indoor | forest | tunnel | matterport）
 ./scripts/start_adexpro.sh indoor   # AdExPro
 ./scripts/start_expro.sh   indoor   # ExPro
-./scripts/start_oracle.sh  indoor   # 使用 oracle 预测器的 ExPro（用真值填充 frontier 窗口）
+./scripts/start_oexp.sh    indoor   # OExp：用真值填充 frontier 窗口的 ExPro
 #   baseline：start_{tare,gbp2,nbvplanner,ariadne,cogniplan,mapex,greedy}.sh
 
 # 关闭（tmux session 以方法名命名）
@@ -92,5 +92,5 @@ tmux kill-session -t adexpro
 ./scripts/run_experiments.sh indoor_self_adapt
 ```
 
-所有输出都写到 `dev_results/experiments/`（节点日志、AdExPro 训练日志、runner 的 CSV、prediction_eval 的结果）。运行时还会弹出一个实时热力图窗口，显示地图预测哪里对、哪里错，
+每次运行都写到自己的文件夹 `dev_results/experiments/<方法>/<地图>/<时间戳>/`：`logs/`（节点日志）、`metrics_*.txt` 和 `trajectory_*.txt`、`grid_metrics.csv`（occupancy grid 大小随时间的变化）、`prediction_eval/`，以及按需生成的 `run.csv`（批量运行）和 `online_train/`（AdExPro）。批量运行还会追加写入 `dev_results/experiments/summary.csv`。运行时还会弹出一个实时热力图窗口，显示地图预测哪里对、哪里错，
 见 [dev_visualization/README.md](dev_visualization/README.md)。

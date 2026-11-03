@@ -72,10 +72,6 @@ def _termination_cfg(cfg: dict) -> TerminationCfg:
     )
 
 
-def _run_tag(task: Task, timestamp: str) -> str:
-    return f"{task.baseline}_{task.world}_r{task.run_idx}_{timestamp}"
-
-
 def _open_summary(summary_path: Path):
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     new = not summary_path.exists()
@@ -98,8 +94,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     output_dir = Path(cfg.get("output_dir", "dev_results/experiments"))
     if not output_dir.is_absolute():
         output_dir = (args.workspace / output_dir).resolve()
-    log_dir = output_dir / "logs"
-    runs_dir = output_dir / "runs"
     summary_path = output_dir / "summary.csv"
 
     term_cfg = _termination_cfg(cfg)
@@ -115,7 +109,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
 
-    launcher = TmuxLauncher(workspace_root=args.workspace, log_dir=log_dir,
+    launcher = TmuxLauncher(workspace_root=args.workspace,
                             experiments_dir=output_dir)
     summary_file, summary_writer = _open_summary(summary_path)
 
@@ -138,9 +132,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             spec = BASELINES[task.baseline]
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             session = f"er_{spec.name}_{task.world}_r{task.run_idx}_{timestamp}"
-            run_tag = _run_tag(task, timestamp)
-            csv_path = (runs_dir / task.world / task.baseline
-                        / f"run_{task.run_idx}_{timestamp}.csv")
+            run_dir = output_dir / task.baseline / task.world / timestamp
 
             print(f"\n[runner] ── [{task_idx}/{len(tasks)}] "
                   f"{task.baseline} on {task.world} (run {task.run_idx}, "
@@ -152,8 +144,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 spec=spec,
                 task=task,
                 session=session,
-                run_tag=run_tag,
-                csv_path=csv_path,
+                run_dir=run_dir,
                 term_cfg=term_cfg,
                 summary_writer=summary_writer,
                 summary_file=summary_file,
@@ -170,14 +161,15 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 
 def _run_one(*, monitor: RunMonitor, launcher: TmuxLauncher, spec, task: Task,
-             session: str, run_tag: str, csv_path: Path,
+             session: str, run_dir: Path,
              term_cfg: TerminationCfg, summary_writer, summary_file,
              interrupted: threading.Event) -> None:
     end_reason = None
     result = None
+    csv_path = run_dir / "run.csv"
 
     try:
-        launcher.start(spec, task.world, session, run_tag)
+        launcher.start(spec, task.world, session, run_dir)
         print(f"[runner]   tmux session: {session}  (attach to watch)")
 
         print("[runner]   waiting for /state_estimation ...")

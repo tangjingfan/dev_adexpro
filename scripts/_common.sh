@@ -11,21 +11,13 @@
 # terminal; only the planner pane differs.
 
 # REPO = the repo root (where these scripts live, under scripts/), which is
-# also the colcon workspace (WS). Run output (node logs, online-train logs) goes to
-# dev_results/experiments/.
+# also the colcon workspace (WS). Each run gets its own folder,
+# dev_results/experiments/<method>/<world>/<stamp>/ (see start_session).
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WS="$REPO"
 EXPERIMENTS_DIR="$REPO/dev_results/experiments"
-LOG_DIR="$EXPERIMENTS_DIR/node_logs"
-mkdir -p "$LOG_DIR"
 DEACTIVATE="conda deactivate 2>/dev/null; conda deactivate 2>/dev/null"
 case "$(basename "$SHELL")" in zsh) EXT=zsh;; bash) EXT=bash;; *) EXT=sh;; esac
-SETUP="source /opt/ros/humble/setup.$EXT; source $WS/install/setup.$EXT; export EXPRO_EXPERIMENTS_DIR=$EXPERIMENTS_DIR"
-
-SIM_CMD="$DEACTIVATE; $SETUP; ros2 launch vehicle_simulator system_${WORLD}.launch"
-MAPPING_CMD="sleep 8; $DEACTIVATE; $SETUP; ros2 launch simulator mapping_${WORLD}.launch"
-FREE_CMD="$DEACTIVATE; $SETUP"
-
 # Redirect for a pane command: log_to log_x.txt -> > "<LOG_DIR>/log_x.txt" 2>&1
 log_to() { echo "> \"$LOG_DIR/$1\" 2>&1"; }
 
@@ -36,10 +28,18 @@ world_launch_py() {
 
 # Fresh tmux session SESSION=<name>: two columns, the left split into <left>
 # panes and the right into <right>. Panes are numbered top to bottom, left
-# column first.
+# column first. <name> is also the method: this run's output folder and the
+# pane commands that write to it (SETUP, SIM_CMD, ...) are set here.
 start_session() {
   SESSION=$1
   local left=$2 right=$3 i
+  RUN_DIR="$EXPERIMENTS_DIR/$SESSION/$WORLD/$(date +%Y%m%d_%H%M%S)"
+  LOG_DIR="$RUN_DIR/logs"
+  mkdir -p "$LOG_DIR"
+  SETUP="source /opt/ros/humble/setup.$EXT; source $WS/install/setup.$EXT; export EXPRO_EXPERIMENTS_DIR=$EXPERIMENTS_DIR EXPRO_RUN_DIR=$RUN_DIR"
+  SIM_CMD="$DEACTIVATE; $SETUP; ros2 launch vehicle_simulator system_${WORLD}.launch"
+  MAPPING_CMD="sleep 8; $DEACTIVATE; $SETUP; ros2 launch simulator mapping_${WORLD}.launch"
+  FREE_CMD="$DEACTIVATE; $SETUP"
   tmux kill-session -t "$SESSION" 2>/dev/null
   tmux new-session -d -s "$SESSION" -x 220 -y 50
   tmux split-window -h -t "$SESSION"

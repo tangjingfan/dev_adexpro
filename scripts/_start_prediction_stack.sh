@@ -1,17 +1,17 @@
 #!/bin/bash
-# Shared implementation behind start_adexpro.sh / start_expro.sh / start_oracle.sh:
+# Shared implementation behind start_adexpro.sh / start_expro.sh / start_oexp.sh:
 # the full stack in a tmux session named after the prediction METHOD:
 #   adexpro learned FPUnet prediction + online update  (map_prediction_online_update.launch)
 #   expro   learned FPUnet prediction, no online update (map_prediction.launch)
-#   oracle  GT-filled frontier windows                  (oracle_map_prediction.launch)
+#   oexp  GT-filled frontier windows                  (oexp_map_prediction.launch)
 #
 # Every method also gets a GT octomap (/gt_map), prediction_eval, which scores
-# each /predicted_map against it (dev_results/experiments/prediction_eval/), and
+# each /predicted_map against it (<run folder>/prediction_eval/), and
 # prediction_heatmap's live accuracy window.
 #
 # Usage: ./scripts/_start_prediction_stack.sh <world> <method> [conda_env]
 #   conda_env defaults to adexpro. Set ATTACH=0 to leave the session detached,
-#   EVAL=0 to skip prediction_eval and the window (the oracle still gets its GT octomap).
+#   EVAL=0 to skip prediction_eval and the window (the oexp still gets its GT octomap).
 
 WORLD=${1:?world required}
 METHOD=${2:?method required}
@@ -22,9 +22,9 @@ CONDA_ENV=${3:-adexpro}
 case "$METHOD" in
   adexpro) PRED_LAUNCH="map_prediction_online_update.launch" ;;
   expro)   PRED_LAUNCH="map_prediction.launch" ;;
-  oracle)  PRED_LAUNCH="oracle_map_prediction.launch" ;;
+  oexp)  PRED_LAUNCH="oexp_map_prediction.launch" ;;
   *)
-    echo "Unknown method '$METHOD' (expected: adexpro | expro | oracle)" >&2
+    echo "Unknown method '$METHOD' (expected: adexpro | expro | oexp)" >&2
     exit 1
     ;;
 esac
@@ -38,9 +38,9 @@ run_pane 0 "$SIM_CMD"
 run_pane 1 "$MAPPING_CMD"
 
 # ── Pane 2 (bottom-left): Map prediction ($METHOD, conda: $CONDA_ENV) ──
-# The oracle backend needs /gt_map (started in pane 4) to be up first, so it
+# The oexp backend needs /gt_map (started in pane 4) to be up first, so it
 # waits a little longer than the learned backends.
-if [ "$METHOD" = oracle ]; then PRED_SLEEP=12; else PRED_SLEEP=10; fi
+if [ "$METHOD" = oexp ]; then PRED_SLEEP=12; else PRED_SLEEP=10; fi
 run_pane 2 "sleep $PRED_SLEEP; conda activate $CONDA_ENV; $SETUP; ros2 launch simulator $PRED_LAUNCH $(log_to "log_prediction_${METHOD}.txt")"
 
 # ── Pane 3 (top-right): Planner + RViz ─────────────────────────────────────
@@ -48,10 +48,10 @@ run_pane 3 "sleep 10; $DEACTIVATE; $SETUP; ros2 launch simulator planner_${WORLD
 
 # ── Pane 4 (mid-right): GT octomap (/overall_map → /gt_map) + prediction_eval
 #    + the live heatmap window.
-# The oracle backend also fills its windows from this /gt_map.
+# The oexp backend also fills its windows from this /gt_map.
 if [ "${EVAL:-1}" != 0 ]; then
   run_pane 4 "sleep 8; $DEACTIVATE; $SETUP; ros2 launch prediction_heatmap prediction_heatmap.launch world:=$WORLD method:=$METHOD $(log_to "log_prediction_eval_${METHOD}.txt")"
-elif [ "$METHOD" = oracle ]; then
+elif [ "$METHOD" = oexp ]; then
   run_pane 4 "sleep 8; $DEACTIVATE; $SETUP; ros2 launch simulator gt_mapping_${WORLD}.launch"
 else
   run_pane 4 "$FREE_CMD"

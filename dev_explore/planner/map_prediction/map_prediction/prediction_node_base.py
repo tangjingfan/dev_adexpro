@@ -7,7 +7,7 @@ everything that belongs to the contract rather than to a backend: the common
 parameters, the interfaces, the background-inference loop, frontier extraction
 and the grid <-> numpy plumbing.
 
-Kept torch-free so the oracle backend does not pull in the learned model.
+Kept torch-free so the oexp backend does not pull in the learned model.
 """
 
 import array

@@ -1,4 +1,4 @@
-# Indoor: 5 runs of oracle.
+# Indoor: 5 runs of oexp.
 # Run order = entry order; repeats within an entry are consecutive.
 
 output_dir: dev_results/experiments
@@ -10,7 +10,7 @@ termination:
   odom_silence_s: 5.0
 
 runs:
-  - baseline: oracle
+  - baseline: oexp
     world: indoor
     repeats: 5
     max_time_s: 700

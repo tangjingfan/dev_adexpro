@@ -9,4 +9,6 @@
     <remap from="cloud_in" to="/sensor_scan" />
   </node> -->
 
+  <node pkg="grid_recorder" exec="grid_recorder" name="grid_recorder" output="screen" />
+
 </launch>

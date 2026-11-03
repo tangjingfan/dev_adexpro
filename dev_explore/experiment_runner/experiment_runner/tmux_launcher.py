@@ -40,6 +40,7 @@ def _build_pane_cmd(
     workspace_root: Path,
     log_path: Optional[Path],
     experiments_dir: Optional[Path] = None,
+    run_dir: Optional[Path] = None,
 ) -> str:
     """Build the shell command sent to a tmux pane.
 
@@ -57,10 +58,12 @@ def _build_pane_cmd(
     )
     if pane.conda_env:
         parts.append(f"conda activate {pane.conda_env}")
-    # Nodes that write their own logs (self_adapt's online_train/) resolve
-    # relative paths against this, so they land beside the runner's output.
+    # Nodes that write their own output (prediction_eval, self_adapt's
+    # online_train/, visualization_tools' metrics) put it in this run's folder.
     if experiments_dir is not None:
         parts.append(f"export EXPRO_EXPERIMENTS_DIR={shlex.quote(str(experiments_dir))}")
+    if run_dir is not None:
+        parts.append(f"export EXPRO_RUN_DIR={shlex.quote(str(run_dir))}")
 
     launch_cmd = pane.cmd_template.format(world=world)
     if log_path is not None:
@@ -70,12 +73,10 @@ def _build_pane_cmd(
 
 
 class TmuxLauncher:
-    def __init__(self, workspace_root: Path, log_dir: Path,
+    def __init__(self, workspace_root: Path,
                  experiments_dir: Optional[Path] = None):
         self.workspace_root = workspace_root.resolve()
-        self.log_dir = log_dir.resolve()
         self.experiments_dir = experiments_dir.resolve() if experiments_dir else None
-        self.log_dir.mkdir(parents=True, exist_ok=True)
 
     def session_exists(self, session: str) -> bool:
         return _run(["tmux", "has-session", "-t", session]).returncode == 0
@@ -85,11 +86,15 @@ class TmuxLauncher:
         spec: BaselineSpec,
         world: str,
         session: str,
-        run_tag: str,
+        run_dir: Path,
     ) -> List[Path]:
         """Create the tmux session and dispatch all panes. Returns log paths."""
         if self.session_exists(session):
             self.kill(session)
+
+        run_dir = run_dir.resolve()
+        log_dir = run_dir / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
 
         _run(["tmux", "new-session", "-d", "-s", session, "-x", "220", "-y", "50"],
              check=True)
@@ -112,7 +117,7 @@ class TmuxLauncher:
 
         log_paths: List[Path] = []
         for idx, pane in enumerate(panes):
-            log_file = self.log_dir / f"{run_tag}__{pane.label}.txt"
+            log_file = log_dir / f"{pane.label}.txt"
             log_paths.append(log_file)
             cmd_str = _build_pane_cmd(
                 pane=pane,
@@ -120,6 +125,7 @@ class TmuxLauncher:
                 workspace_root=self.workspace_root,
                 log_path=log_file,
                 experiments_dir=self.experiments_dir,
+                run_dir=run_dir,
             )
             _run([
                 "tmux", "send-keys", "-t", f"{session}:0.{idx}",

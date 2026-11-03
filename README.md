@@ -26,7 +26,7 @@ The table maps the names used in code (baselines, scripts, tmux sessions) to the
 |----------------|-----------|
 | ExPro          | `expro`   |
 | AdExPro        | `adexpro` |
-| ExPro (oracle) | `oracle`  |
+| OExp           | `oexp`    |
 
 ## Set Up
 
@@ -82,7 +82,7 @@ From the repo root, inside the container:
 #   world defaults to garage (also: indoor | forest | tunnel | matterport)
 ./scripts/start_adexpro.sh indoor   # AdExPro
 ./scripts/start_expro.sh   indoor   # ExPro
-./scripts/start_oracle.sh  indoor   # ExPro with an oracle predictor (GT-filled frontier windows)
+./scripts/start_oexp.sh    indoor   # OExp: ExPro with GT-filled frontier windows
 #   baselines: start_{tare,gbp2,nbvplanner,ariadne,cogniplan,mapex,greedy}.sh
 
 # kill it (the tmux session is named after the method)
@@ -92,6 +92,9 @@ tmux kill-session -t adexpro
 ./scripts/run_experiments.sh indoor_self_adapt
 ```
 
-All output lands in `dev_results/experiments/` (node logs, AdExPro training logs, runner CSVs,
-prediction_eval results). While a method runs, a live heatmap window shows where its map predictions are right or wrong, see
+Each run writes to its own folder, `dev_results/experiments/<method>/<world>/<stamp>/`: `logs/`
+(node logs), `metrics_*.txt` and `trajectory_*.txt`, `grid_metrics.csv` (occupancy grid size over
+time), `prediction_eval/`, and where they apply
+`run.csv` (batch runs) and `online_train/` (AdExPro). Batch runs also append to
+`dev_results/experiments/summary.csv`. While a method runs, a live heatmap window shows where its map predictions are right or wrong, see
 [dev_visualization/README.md](dev_visualization/README.md).

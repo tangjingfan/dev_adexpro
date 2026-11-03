@@ -3,7 +3,8 @@
 # Usage: ./scripts/run_experiments.sh <config>
 #   config: a YAML path, or a name under dev_explore/experiment_runner/config/
 #           (e.g. indoor_self_adapt)
-# Results go to dev_results/experiments/ (the configs' output_dir).
+# Results go to <output_dir>/<method>/<world>/<stamp>/ (output_dir is
+# dev_results/experiments/ in the configs), plus <output_dir>/summary.csv.
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 WS="$REPO"

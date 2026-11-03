@@ -1,4 +1,4 @@
-"""Oracle prediction backend: instead of running the learned model, fill each
+"""OExp prediction backend: instead of running the learned model, fill each
 frontier's local window from a ground-truth occupancy grid. Serves the same
 contract as the learned backend, so it is a drop-in replacement for measuring
 how much a perfect predictor would buy."""
@@ -12,17 +12,17 @@ from .grid_encoding import UNKNOWN_VALUE
 from .prediction_node_base import PredictionNodeBase
 
 
-class OracleMapPredictionNode(PredictionNodeBase):
-    inference_label = "Oracle inference"
+class OExpMapPredictionNode(PredictionNodeBase):
+    inference_label = "OExp inference"
 
     def __init__(self):
-        super().__init__("oracle_map_prediction_node")
+        super().__init__("oexp_map_prediction_node")
 
         self.gt_map = None
         self._resolution_warned = False
 
         self.get_logger().info(
-            f"Oracle ready: gt_map_topic={self.gt_map_topic} "
+            f"OExp ready: gt_map_topic={self.gt_map_topic} "
             f"model_input_size={self.model_input_size} "
             f"expansion={self.prediction_expansion_cells}"
         )
@@ -160,7 +160,7 @@ class OracleMapPredictionNode(PredictionNodeBase):
 
     def _check_resolution_compatibility(self, visible_map, gt_map):
         # The window crop is in *cells*, so different resolutions silently change
-        # the physical footprint of the oracle. Warn once instead of resampling —
+        # the physical footprint of the oexp. Warn once instead of resampling —
         # the typical setup publishes GT at the visible-map resolution.
         if self._resolution_warned:
             return
@@ -170,14 +170,14 @@ class OracleMapPredictionNode(PredictionNodeBase):
             self._resolution_warned = True
             self.get_logger().warn(
                 f"GT resolution ({gr:.4f} m) differs from visible map "
-                f"({vr:.4f} m); oracle window footprint will not match the "
+                f"({vr:.4f} m); oexp window footprint will not match the "
                 f"learned predictor. Republish GT at {vr:.4f} m to fix."
             )
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = OracleMapPredictionNode()
+    node = OExpMapPredictionNode()
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):

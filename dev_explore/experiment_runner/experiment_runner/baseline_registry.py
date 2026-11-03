@@ -21,7 +21,7 @@ class LaunchPane:
 class BaselineSpec:
     name: str                                 # tmux session base name
     planner: LaunchPane                       # required, the main planner pane
-    mapping: Optional[LaunchPane] = None      # None when baseline brings its own mapping (tare)
+    mapping: Optional[LaunchPane] = None      # also records the grid size (grid_recorder)
     extras: Tuple[LaunchPane, ...] = ()       # e.g. map_prediction for adexpro
 
     def format(self, template: str, world: str) -> str:
@@ -39,7 +39,7 @@ def _mapping(world_override: Optional[str] = None) -> LaunchPane:
 
 def _prediction_eval(method: str) -> LaunchPane:
     """GT octomap (/gt_map) + prediction_eval, scoring /predicted_map against GT.
-    Writes under <output_dir>/prediction_eval/. The oracle reads the same /gt_map.
+    Writes to <run folder>/prediction_eval/. The oexp reads the same /gt_map.
     Headless: batch runs open no heatmap window (prediction_heatmap.launch does)."""
     return LaunchPane(
         label="prediction_eval",
@@ -91,18 +91,18 @@ BASELINES = {
             delay_s=10.0,
         ),
     ),
-    # Like expro, but swaps the learned predictor for the oracle node that
+    # Like expro, but swaps the learned predictor for the oexp node that
     # fills frontier-local windows from a GT octomap. Mirrors
-    # start_oracle.sh: the prediction_eval pane publishes /gt_map, which the
-    # oracle node reads.
-    "oracle": BaselineSpec(
-        name="oracle",
+    # start_oexp.sh: the prediction_eval pane publishes /gt_map, which the
+    # oexp node reads.
+    "oexp": BaselineSpec(
+        name="oexp",
         mapping=_mapping(),
         extras=(
-            _prediction_eval("oracle"),
+            _prediction_eval("oexp"),
             LaunchPane(
-                label="oracle_map_prediction",
-                cmd_template="ros2 launch simulator oracle_map_prediction.launch",
+                label="oexp_map_prediction",
+                cmd_template="ros2 launch simulator oexp_map_prediction.launch",
                 conda_env="adexpro",
                 delay_s=12.0,
             ),
@@ -160,9 +160,10 @@ BASELINES = {
             delay_s=10.0,
         ),
     ),
+    # TARE plans without this map; it runs only to record the grid size.
     "tare": BaselineSpec(
         name="tare",
-        mapping=None,
+        mapping=_mapping(),
         planner=LaunchPane(
             label="planner",
             cmd_template="ros2 launch tare_planner explore_{world}.launch",

@@ -1,6 +1,6 @@
 <launch>
   <!-- world: which gt_mapping_<world>.launch provides /gt_map.
-       method: tag stored with the results (expro | adexpro | oracle).
+       method: tag stored with the results (expro | adexpro | oexp).
        include_gt: start the GT octomap here; set false if something else
        already publishes /gt_map.
        Headless; prediction_heatmap.launch adds the live window. -->

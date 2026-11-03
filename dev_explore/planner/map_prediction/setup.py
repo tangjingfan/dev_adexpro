@@ -14,14 +14,14 @@ setup(
         ('share/' + package_name + '/config', [
             'config/map_prediction.yaml',
             'config/online_update.yaml',
-            'config/oracle_map_prediction.yaml',
+            'config/oexp_map_prediction.yaml',
         ]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Jingfan',
     maintainer_email='tangjingfan@gmail.com',
-    description='Map prediction node with a learned (FPUnet) and an oracle backend.',
+    description='Map prediction node with a learned (FPUnet) and an oexp backend.',
     license='TODO: License declaration',
     extras_require={
         'test': [
@@ -32,7 +32,7 @@ setup(
         'console_scripts': [
             'map_prediction_node = map_prediction.map_prediction_node:main',
             'self_adapt_node = map_prediction.self_adapt:main',
-            'oracle_map_prediction_node = map_prediction.oracle_map_prediction_node:main',
+            'oexp_map_prediction_node = map_prediction.oexp_map_prediction_node:main',
         ],
     },
 )
