@@ -10,7 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/models', ['models/best_fpunet_256_8.pth']),
+        ('share/' + package_name + '/models', ['models/best_fpunet_128.pth']),
         ('share/' + package_name + '/config', [
             'config/map_prediction.yaml',
             'config/online_update.yaml',

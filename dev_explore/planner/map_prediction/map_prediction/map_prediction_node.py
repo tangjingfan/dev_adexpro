@@ -34,7 +34,7 @@ class MapPredictionNode(PredictionNodeBase):
 
     def _declare_parameters(self):
         super()._declare_parameters()
-        self.declare_parameter("model_path", "models/best_fpunet_256_8.pth")
+        self.declare_parameter("model_path", "models/best_fpunet_128.pth")
         self.declare_parameter("device", "auto")
         self.declare_parameter("inference_batch_size", 16)
         self.declare_parameter("enable_uncertainty", False)

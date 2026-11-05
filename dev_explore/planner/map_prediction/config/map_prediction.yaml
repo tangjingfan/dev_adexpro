@@ -1,9 +1,9 @@
 map_prediction_node:
   ros__parameters:
-    prediction_cycle: 2.0
-    model_path: models/best_fpunet_256_8.pth
+    prediction_cycle: 1.0
+    model_path: models/best_fpunet_128.pth
     device: auto
-    model_input_size: 128
+    model_input_size: 64
     inference_batch_size: 8
     enable_prediction: true
     prediction_expansion_cells: 50

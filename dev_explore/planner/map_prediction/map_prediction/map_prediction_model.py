@@ -456,7 +456,7 @@ class MapPredictionModel:
         )
 
     @staticmethod
-    def get_local_map(global_map, frontier_point, local_map_size, default_value=FREE_VALUE):
+    def get_local_map(global_map, frontier_point, local_map_size, default_value=UNKNOWN_VALUE):
         local_map = np.empty(
             (2 * local_map_size, 2 * local_map_size),
             dtype=np.uint8,
@@ -476,7 +476,7 @@ class MapPredictionModel:
         frontier_point,
         local_map_size,
         destination,
-        default_value=FREE_VALUE,
+        default_value=UNKNOWN_VALUE,
     ):
         goal_x, goal_y = frontier_point
         map_height, map_width = global_map.shape
