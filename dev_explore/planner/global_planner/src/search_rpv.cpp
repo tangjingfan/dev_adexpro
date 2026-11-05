@@ -70,6 +70,8 @@ double RPVStar<Policy, Store, IOG>::RunGreedy(long start,
     const auto &costs = adj_cost_[curr];
     for (size_t j = 0; j < succs.size(); ++j) {
       if (visited[succs[j]]) continue;
+      if (succs[j] == constraints_.last_vertex && i < n_ - 2) continue;
+      if (i == 0 && constraints_.first_hop >= 0 && succs[j] != constraints_.first_hop) continue;
       if (costs[j] < min_dist) {
         min_dist = costs[j];
         next = succs[j];
@@ -87,6 +89,16 @@ double RPVStar<Policy, Store, IOG>::RunGreedy(long start,
     path_out.push_back(curr);
   }
   return total;
+}
+
+template <class Policy, class Store, bool IOG>
+void RPVStar<Policy, Store, IOG>::CheckConstraints(long vo) const {
+  const auto valid = [&](long v) { return v == -1 || (v >= 0 && v < n_ && v != vo); };
+  if (!valid(constraints_.last_vertex) || !valid(constraints_.first_hop) ||
+      (constraints_.first_hop >= 0 && constraints_.first_hop == constraints_.last_vertex &&
+       n_ > 2)) {
+    throw std::invalid_argument("RPV constraints name an invalid or conflicting vertex");
+  }
 }
 
 template <class Policy, class Store, bool IOG>
@@ -110,6 +122,7 @@ long RPVStar<Policy, Store, IOG>::Search(long vo, PlannerGraph *g, double time_l
                              std::vector<double> &prob_vec) {
   SetGraph(g);
   SetProb(prob_vec);
+  CheckConstraints(vo);
   time_limit_ = time_limit;
   open_heap_.clear();
   open_heap_.reserve(1 << 14);
@@ -173,6 +186,7 @@ long RPVStar<Policy, Store, IOG>::Search(long vo, PlannerGraph *g, double time_l
     for (size_t i = 0; i < succs.size(); ++i) {
       const long v = succs[i];
       if ((l.visited_set >> v) & 1ull) continue;
+      if (!Allowed(l.visited_set, l.visited_count, v)) continue;
       const double new_q = l.q + costs[i];
       const double new_g =
           Policy::step(l.g, prob_[v], new_q, costs[i], l.p_rem);
@@ -213,6 +227,7 @@ long RPVStar<Policy, Store, IOG>::FocalSearch(long vo, PlannerGraph *g, double t
                                   std::vector<double> &prob_vec) {
   SetGraph(g);
   SetProb(prob_vec);
+  CheckConstraints(vo);
   time_limit_ = time_limit;
 
   SimpleTimer timer;
@@ -334,6 +349,7 @@ long RPVStar<Policy, Store, IOG>::FocalSearch(long vo, PlannerGraph *g, double t
     for (size_t i = 0; i < succs.size(); ++i) {
       const long v = succs[i];
       if ((l.visited_set >> v) & 1ull) continue;
+      if (!Allowed(l.visited_set, l.visited_count, v)) continue;
       const double new_q = l.q + costs[i];
       const double new_g =
           Policy::step(l.g, prob_[v], new_q, costs[i], l.p_rem);
@@ -472,10 +488,11 @@ int RunRPVAStar(SparseGraph *g, long vo, std::vector<double> &p,
 template <class Policy, class Store, bool IOG>
 int RunRPVFocal(SparseGraph *g, long vo, std::vector<double> &p,
                 double time_limit, bool use_heuristic, HeuristicMode mode,
-                RPVResult &res) {
+                RPVResult &res, const RPVConstraints &constraints = {}) {
   std::cout << "[INFO] Start to find Hamiltonian Path in " << time_limit
             << " s." << std::endl;
   RPVStar<Policy, Store, IOG> solver(use_heuristic, mode);
+  solver.SetConstraints(constraints);
   solver.FocalSearch(vo, g, time_limit, p);
   solver.ConstructPath();
   res = solver.GetRPVResult();
@@ -523,6 +540,13 @@ int RunMinSumRPVFocal(SparseGraph *g, long vo, std::vector<double> &p,
   }
   return RunRPVFocal<MinSumPolicy, RPVScalarStateTable, true>(
       g, vo, p, time_limit, use_heuristic, mode, res);
+}
+
+int RunMinSumRPVFocal(SparseGraph *g, long vo, std::vector<double> &p,
+                      double time_limit, bool use_heuristic, HeuristicMode mode,
+                      const RPVConstraints &constraints, RPVResult &res) {
+  return RunRPVFocal<MinSumPolicy, RPVScalarStateTable, true>(
+      g, vo, p, time_limit, use_heuristic, mode, res, constraints);
 }
 
 // Min-max has no suffix-mass rewrite, so State and State2D share a store and
