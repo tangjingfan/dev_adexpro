@@ -1,0 +1,8 @@
+# Map-edge frontiers only, each weighted by the ground-truth area behind it: what
+# a perfect workload predictor would give the RPV. Needs reference_publisher.
+# Overrides coarse_planner.yaml.
+global_planner_node:
+  ros__parameters:
+    predicted_frontier_mode: none
+    vertex_weight: gt_workload
+    gt_workload_exponent: 1.0

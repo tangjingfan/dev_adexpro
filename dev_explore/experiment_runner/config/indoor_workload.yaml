@@ -1,0 +1,36 @@
+# Indoor: does knowing the area behind each frontier beat equal weights?
+# Alternated so slow drift over the batch affects both alike.
+
+output_dir: dev_results/experiments
+
+termination:
+  stuck_window_s: 20.0
+  stuck_dist_m: 2.5
+  warmup_s: 30.0
+  odom_silence_s: 5.0
+
+runs:
+  - baseline: frontier_only
+    world: indoor
+    repeats: 1
+    max_time_s: 700
+  - baseline: oworkload
+    world: indoor
+    repeats: 1
+    max_time_s: 700
+  - baseline: frontier_only
+    world: indoor
+    repeats: 1
+    max_time_s: 700
+  - baseline: oworkload
+    world: indoor
+    repeats: 1
+    max_time_s: 700
+  - baseline: frontier_only
+    world: indoor
+    repeats: 1
+    max_time_s: 700
+  - baseline: oworkload
+    world: indoor
+    repeats: 1
+    max_time_s: 700

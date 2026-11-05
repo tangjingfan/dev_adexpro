@@ -140,6 +140,13 @@ global_planner_node:
     # candidates, and geodesic distances and RPV edge costs route around it.
     # Cells within 3 of the robot stay open so it can leave a wall. 0 disables.
     reachability_inflation_cells: 1
+    # A map-edge frontier inside that inflation (one hugging a wall) moves onto the
+    # reachable cell beside it instead of being lost. If it stays while the robot
+    # spends wall_frontier_max_dwell_s within wall_frontier_visit_radius_cells of
+    # it, it is dropped for the rest of the run.
+    wall_frontier_snap: true
+    wall_frontier_visit_radius_cells: 5
+    wall_frontier_max_dwell_s: 5.0
     occupied_cell_threshold: 50
 
     # Predicted map

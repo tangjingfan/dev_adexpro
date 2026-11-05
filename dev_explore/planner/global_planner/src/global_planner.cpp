@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <stdexcept>
 #include <cmath>
 #include <cstring>
 #include <mutex>
@@ -75,6 +76,12 @@ void GlobalPlanner::declareParameters() {
   declare_parameter("global_guide_enabled", true);
   declare_parameter("global_guide_period", 3);
   declare_parameter("predicted_frontier_mode", "poisson");
+  declare_parameter("vertex_weight", "confidence");
+  declare_parameter("wall_frontier_snap", false);
+  declare_parameter("wall_frontier_visit_radius_cells", 5);
+  declare_parameter("wall_frontier_max_dwell_s", 5.0);
+  declare_parameter("gt_workload_exponent", 1.0);
+  declare_parameter("gt_free_map_topic", "/reference_free_map");
   declare_parameter("predicted_region_min_cells", 20);
   declare_parameter("reachability_inflation_cells", 0);
   declare_parameter("predicted_tile_size_m", 4.0);
@@ -124,6 +131,8 @@ void GlobalPlanner::loadParameters() {
     predictedFrontierMode_ = PredictedFrontierMode::Tile;
   } else if (predictedMode == "region") {
     predictedFrontierMode_ = PredictedFrontierMode::Region;
+  } else if (predictedMode == "none") {
+    predictedFrontierMode_ = PredictedFrontierMode::None;
   } else {
     if (predictedMode != "poisson") {
       RCLCPP_WARN(get_logger(), "Unknown predicted_frontier_mode '%s', using poisson",
@@ -131,6 +140,15 @@ void GlobalPlanner::loadParameters() {
     }
     predictedFrontierMode_ = PredictedFrontierMode::Poisson;
   }
+  const auto vertexWeight            = get_parameter("vertex_weight").as_string();
+  if (vertexWeight != "confidence" && vertexWeight != "gt_workload") {
+    throw std::invalid_argument("vertex_weight must be confidence or gt_workload, got " + vertexWeight);
+  }
+  useGtWorkload_                     = vertexWeight == "gt_workload";
+  gtWorkloadExponent_                = get_parameter("gt_workload_exponent").as_double();
+  wallFrontierSnap_                  = get_parameter("wall_frontier_snap").as_bool();
+  wallFrontierVisitRadiusCells_      = static_cast<int>(get_parameter("wall_frontier_visit_radius_cells").as_int());
+  wallFrontierMaxDwellS_             = get_parameter("wall_frontier_max_dwell_s").as_double();
   predictedRegionMinCells_           = static_cast<int>(get_parameter("predicted_region_min_cells").as_int());
   reachabilityInflationCells_        = std::max(0, static_cast<int>(get_parameter("reachability_inflation_cells").as_int()));
   predictedTileSizeM_                = get_parameter("predicted_tile_size_m").as_double();
@@ -145,6 +163,15 @@ void GlobalPlanner::initializeSubscribers() {
   confidenceSub_ = create_subscription<prob_msgs::msg::ProbGrid>("/confidence_map", 10, std::bind(&GlobalPlanner::confidenceCallback, this, std::placeholders::_1));
   odomSub_       = create_subscription<nav_msgs::msg::Odometry>("/state_estimation", 10, std::bind(&GlobalPlanner::odomCallback, this, std::placeholders::_1));
   replanSub_     = create_subscription<std_msgs::msg::Bool>("/replan_request", 10, std::bind(&GlobalPlanner::replanCallback, this, std::placeholders::_1));
+  if (useGtWorkload_) {
+    gtFreeSub_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
+        get_parameter("gt_free_map_topic").as_string(),
+        rclcpp::QoS(1).transient_local().reliable(),
+        [this](nav_msgs::msg::OccupancyGrid::ConstSharedPtr msg) {
+          std::lock_guard<std::mutex> lock(gtFreeMutex_);
+          gtFreeMap_ = std::move(msg);
+        });
+  }
   rclcpp::QoS explorationControlQos(1);
   explorationControlQos.transient_local();
   explorationControlQos.reliable();
@@ -254,6 +281,14 @@ void GlobalPlanner::explorationEnabledCallback(
 }
 
 bool GlobalPlanner::mapsReady() const {
+  if (useGtWorkload_) {
+    // Never fall back to uniform weights: the run would no longer be the
+    // experiment it is labelled as.
+    std::lock_guard<std::mutex> lock(gtFreeMutex_);
+    if (!gtFreeMap_) {
+      return false;
+    }
+  }
   return visibleReceived_ && predictedReceived_ && confidenceReceived_ &&
          odomReceived_;
 }

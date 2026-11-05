@@ -1,7 +1,11 @@
 <launch>
 
+  <!-- Optional second config file from global_planner/config, overriding coarse_planner.yaml. -->
+  <arg name="planner_overlay" default="coarse_planner.yaml" />
+
   <node pkg="global_planner" exec="global_planner_node" name="global_planner_node" output="screen">
     <param from="$(find-pkg-share global_planner)/config/coarse_planner.yaml" />
+    <param from="$(find-pkg-share global_planner)/config/$(var planner_overlay)" />
     <remap from="/visible_map" to="/projected_map" />
   </node>
 

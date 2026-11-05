@@ -112,7 +112,10 @@ void GlobalPlanner::backgroundPlanningLoop() {
     const auto clusteredPredicted = getClusteredPredictedFrontiers(
         ctx->predictedMap, ctx->visibleMap, ctx->confidenceMap,
         ctx->robotMapPos, ctx->reachability);
-    const auto clusteredMapEdges = futureMapEdges.get();
+    auto clusteredMapEdges = futureMapEdges.get();
+    if (useGtWorkload_) {
+      applyGtWorkload(clusteredMapEdges, ctx->visibleMap);
+    }
     auto [localFrontiers, globalFrontierMsg] = classifyAndPublishFrontiers(
         ctx->visibleMap, ctx->predictedMap,
         clusteredMapEdges, clusteredPredicted, ctx->reachability,
