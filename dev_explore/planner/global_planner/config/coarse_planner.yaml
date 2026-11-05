@@ -27,8 +27,8 @@ global_planner_node:
     # map-edge and predicted alike, the nearest this many go to the local RPV
     # and the rest to the global pool. 0 = no local cap. Watch the "RPV: N
     # vertices -> T ms" log line.
-    max_frontiers_to_plan: 20
-    max_local_frontiers_to_plan: 20
+    max_frontiers_to_plan: 19
+    max_local_frontiers_to_plan: 18
     range_threshold_global_frontier: 6.0
 
     # How predicted-space candidates become planning vertices. The candidates
@@ -70,7 +70,7 @@ global_planner_node:
 
     # Replanning thresholds
     replan_path_length_threshold: -1.0 # disable path length requirement for replan; anti-stuck
-    replan_time_threshold: 2.0
+    replan_time_threshold: 1.0
     global_planning_failure_threshold: 1
 
     # Soft-commitment (TARE-style hysteresis). Each successful local plan
@@ -106,7 +106,7 @@ global_planner_node:
     # let the commitment come from the global level instead of from a discount
     # on last cycle's choice.
     global_guide_enabled: true
-    global_guide_period: 3
+    global_guide_period: 6
 
     # A* search
     turn_cost_factor: 2.0
