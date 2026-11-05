@@ -1,6 +1,0 @@
-# Control for the workload experiment: map-edge frontiers only, no predicted
-# vertices, every frontier weighted equally. Overrides coarse_planner.yaml.
-global_planner_node:
-  ros__parameters:
-    predicted_frontier_mode: none
-    vertex_weight: confidence

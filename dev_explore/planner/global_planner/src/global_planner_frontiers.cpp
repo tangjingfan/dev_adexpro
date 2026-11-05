@@ -7,9 +7,6 @@
 #include "../include/global_planner.hpp"
 
 #include <algorithm>
-#include <iterator>
-#include <stdexcept>
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -219,125 +216,14 @@ std::vector<Point2D> GlobalPlanner::getClusteredMapEdgeFrontiers(
       findMapEdgeFrontiers(visible, robotMapPos, frontierDetectionRange_);
   std::vector<Point2D> traversableFrontiers;
 
-  if (wallFrontierSnap_) {
-    traversableFrontiers = selectMapEdgeFrontiers(rawFrontiers, visible, robotMapPos, reachability);
-  } else {
-    for (const auto& frontier : rawFrontiers) {
-      if (isLocalFrontierTraversable(visible, predicted, frontier, true, reachability)) {
-        traversableFrontiers.push_back(frontier);
-      }
+  for (const auto& frontier : rawFrontiers) {
+    if (isLocalFrontierTraversable(visible, predicted, frontier, true, reachability)) {
+      traversableFrontiers.push_back(frontier);
     }
   }
 
   return FindNearest::downsampleFrontiers(
       traversableFrontiers, localClusterSize_, localMinMarginalGain_);
-}
-
-// Frontiers are found on the raw map, but whether one can be visited is decided
-// on the inflated one. A frontier hugging a wall sits inside the inflation, where
-// no path may end, so it is moved onto the reachable cell beside it. A* and the
-// bridge then need no exception, and a passage the inflation closes stays closed.
-//
-// The robot may still be unable to clear the frontier from there. One that stays
-// while the robot spends wall_frontier_max_dwell_s within
-// wall_frontier_visit_radius_cells of it is dropped for the rest of the run, or
-// the robot would orbit it and exploration could never complete.
-std::vector<Point2D> GlobalPlanner::selectMapEdgeFrontiers(
-    const std::vector<Point2D>& rawFrontiers,
-    const nav_msgs::msg::OccupancyGrid& visible,
-    const Point2D& robotMapPos,
-    const ReachabilityData& reachability
-) const {
-  const int width = static_cast<int>(visible.info.width);
-  const int height = static_cast<int>(visible.info.height);
-  const double resolution = visible.info.resolution;
-  const auto isOpen = [&](int x, int y) {
-    return x >= 0 && x < width && y >= 0 && y < height &&
-           visible.data[y * width + x] < occupiedCellThreshold_;
-  };
-  const auto worldCell = [&](const Point2D& cell) {
-    return std::make_pair(
-        static_cast<int>(std::lround(visible.info.origin.position.x / resolution)) + cell.x,
-        static_cast<int>(std::lround(visible.info.origin.position.y / resolution)) + cell.y);
-  };
-
-  const rclcpp::Time stamp = now();
-  // Bounded so a long pause between plans is not counted as time spent nearby.
-  const double elapsed =
-      lastWallFrontierCheck_
-          ? std::min((stamp - *lastWallFrontierCheck_).seconds(), 2.0)
-          : 0.0;
-  lastWallFrontierCheck_ = stamp;
-
-  std::set<Point2D> selected;
-  std::set<std::pair<int, int>> stillPresent;
-  for (const auto& frontier : rawFrontiers) {
-    const int index = frontier.y * width + frontier.x;
-    if (reachability.visible[index]) {
-      selected.insert(frontier);
-      continue;
-    }
-    // The nearest reachable neighbor; a diagonal one must not be behind a corner.
-    int bestDistance = std::numeric_limits<int>::max();
-    Point2D moved;
-    for (int dy = -1; dy <= 1; ++dy) {
-      for (int dx = -1; dx <= 1; ++dx) {
-        const int nx = frontier.x + dx;
-        const int ny = frontier.y + dy;
-        if ((dx == 0 && dy == 0) || nx < 0 || nx >= width || ny < 0 || ny >= height) {
-          continue;
-        }
-        if (dx != 0 && dy != 0 && !isOpen(nx, frontier.y) && !isOpen(frontier.x, ny)) {
-          continue;
-        }
-        const int neighbor = ny * width + nx;
-        if (reachability.visible[neighbor] && reachability.visibleDistance[neighbor] >= 0 &&
-            reachability.visibleDistance[neighbor] < bestDistance) {
-          bestDistance = reachability.visibleDistance[neighbor];
-          moved = Point2D(nx, ny, frontier.prob);
-        }
-      }
-    }
-    if (bestDistance == std::numeric_limits<int>::max()) {
-      continue;
-    }
-    const auto key = worldCell(moved);
-    if (wallFrontierBlacklist_.count(key)) {
-      continue;
-    }
-    stillPresent.insert(key);
-    selected.insert(moved);
-  }
-
-  // Dwell is per moved cell, and forgotten once the frontier is gone.
-  for (auto it = wallFrontierDwellS_.begin(); it != wallFrontierDwellS_.end();) {
-    it = stillPresent.count(it->first) ? std::next(it) : wallFrontierDwellS_.erase(it);
-  }
-  const auto robotCell = worldCell(robotMapPos);
-  const int radiusSq = wallFrontierVisitRadiusCells_ * wallFrontierVisitRadiusCells_;
-  int blacklistedNow = 0;
-  for (const auto& key : stillPresent) {
-    const int dx = key.first - robotCell.first;
-    const int dy = key.second - robotCell.second;
-    if (dx * dx + dy * dy > radiusSq) {
-      continue;
-    }
-    double& dwell = wallFrontierDwellS_[key];
-    dwell += elapsed;
-    if (dwell >= wallFrontierMaxDwellS_) {
-      wallFrontierBlacklist_.insert(key);
-      wallFrontierDwellS_.erase(key);
-      ++blacklistedNow;
-      const Point2D cell(key.first - worldCell(Point2D(0, 0)).first,
-                         key.second - worldCell(Point2D(0, 0)).second);
-      selected.erase(cell);
-    }
-  }
-  RCLCPP_INFO(
-      get_logger(),
-      "Wall frontiers: %zu moved, %d dropped now, %zu dropped in total",
-      stillPresent.size(), blacklistedNow, wallFrontierBlacklist_.size());
-  return std::vector<Point2D>(selected.begin(), selected.end());
 }
 
 std::vector<Point2D> GlobalPlanner::groupPredictedRegions(
@@ -441,9 +327,6 @@ std::vector<Point2D> GlobalPlanner::getClusteredPredictedFrontiers(
     const Point2D& robotMapPos,
     const ReachabilityData& reachability
 ) const {
-  if (predictedFrontierMode_ == PredictedFrontierMode::None) {
-    return {};
-  }
   const auto rawFrontiers = findPredictedSpaceFrontiers(
       predicted, visible, confidence, robotMapPos, frontierDetectionRange_);
   std::vector<Point2D> traversableFrontiers;
@@ -464,7 +347,6 @@ std::vector<Point2D> GlobalPlanner::getClusteredPredictedFrontiers(
     case PredictedFrontierMode::Tile:
       return tilePredictedFrontiers(traversableFrontiers, visible);
     case PredictedFrontierMode::Poisson:
-    case PredictedFrontierMode::None:
       break;
   }
   return FindNearest::downsampleFrontiers(
@@ -583,119 +465,6 @@ void GlobalPlanner::publishPredictedTiles(
   outlines(pool, "pool_tiles", 0.08, 0.21, 0.35f, 0.65f, 1.0f, 0.8f);
   outlines(local, "local_tiles", 0.20, 0.22, 0.05f, 0.30f, 0.85f, 1.0f);
   predictedTilesPub_->publish(markers);
-}
-
-// Oracle for the "predict the workload, not the floor plan" experiment. Every
-// unseen ground-truth free cell belongs to the frontier closest to it through
-// ground-truth free space (multi-source BFS, 4-connected), so an area is counted
-// once however many frontiers border it. A frontier's weight is its cell count,
-// floored at one cell: a zero weight would let the tour defer it forever.
-void GlobalPlanner::applyGtWorkload(
-    std::vector<Point2D>& frontiers,
-    const nav_msgs::msg::OccupancyGrid& visible
-) const {
-  nav_msgs::msg::OccupancyGrid::ConstSharedPtr gt;
-  {
-    std::lock_guard<std::mutex> lock(gtFreeMutex_);
-    gt = gtFreeMap_;
-  }
-  const double resolution = visible.info.resolution;
-  if (!gt || std::abs(gt->info.resolution - resolution) > 1e-6) {
-    throw std::runtime_error("GT free map missing or at a different resolution");
-  }
-  const int gtWidth = static_cast<int>(gt->info.width);
-  const int gtHeight = static_cast<int>(gt->info.height);
-  const int visWidth = static_cast<int>(visible.info.width);
-  const int visHeight = static_cast<int>(visible.info.height);
-  // visible (x, y) is gt (x + offX, y + offY).
-  const int offX = static_cast<int>(std::round(
-      (visible.info.origin.position.x - gt->info.origin.position.x) / resolution));
-  const int offY = static_cast<int>(std::round(
-      (visible.info.origin.position.y - gt->info.origin.position.y) / resolution));
-  const auto isFree = [&](int x, int y) {
-    return x >= 0 && x < gtWidth && y >= 0 && y < gtHeight &&
-           gt->data[y * gtWidth + x] == 0;
-  };
-
-  // Label of the frontier owning each cell; -1 = not reached yet.
-  std::vector<int> owner(gt->data.size(), -1);
-  std::vector<int> queue;
-  queue.reserve(gt->data.size());
-  // A frontier sits on the observed map, which can differ from the ground truth
-  // by a cell or two: seed from the nearest free cell within kSnapCells.
-  constexpr int kSnapCells = 3;
-  for (size_t label = 0; label < frontiers.size(); ++label) {
-    const int fx = frontiers[label].x + offX;
-    const int fy = frontiers[label].y + offY;
-    int bestSq = std::numeric_limits<int>::max();
-    int bestIndex = -1;
-    for (int dy = -kSnapCells; dy <= kSnapCells; ++dy) {
-      for (int dx = -kSnapCells; dx <= kSnapCells; ++dx) {
-        if (isFree(fx + dx, fy + dy) && dx * dx + dy * dy < bestSq) {
-          bestSq = dx * dx + dy * dy;
-          bestIndex = (fy + dy) * gtWidth + fx + dx;
-        }
-      }
-    }
-    if (bestIndex >= 0 && owner[bestIndex] < 0) {
-      owner[bestIndex] = static_cast<int>(label);
-      queue.push_back(bestIndex);
-    }
-  }
-  for (size_t head = 0; head < queue.size(); ++head) {
-    const int index = queue[head];
-    const int x = index % gtWidth;
-    const int y = index / gtWidth;
-    const std::array<std::array<int, 2>, 4> neighbors{
-        {{x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}}};
-    for (const auto& n : neighbors) {
-      if (!isFree(n[0], n[1])) {
-        continue;
-      }
-      const int next = n[1] * gtWidth + n[0];
-      if (owner[next] < 0) {
-        owner[next] = owner[index];
-        queue.push_back(next);
-      }
-    }
-  }
-
-  std::vector<int> cells(frontiers.size(), 0);
-  int unseen = 0;
-  int unassigned = 0;
-  for (int y = 0; y < gtHeight; ++y) {
-    for (int x = 0; x < gtWidth; ++x) {
-      if (gt->data[y * gtWidth + x] != 0) {
-        continue;
-      }
-      const int vx = x - offX;
-      const int vy = y - offY;
-      const bool inside = vx >= 0 && vx < visWidth && vy >= 0 && vy < visHeight;
-      if (inside && visible.data[vy * visWidth + vx] != -1) {
-        continue;
-      }
-      ++unseen;
-      const int label = owner[y * gtWidth + x];
-      if (label < 0) {
-        ++unassigned;
-      } else {
-        ++cells[label];
-      }
-    }
-  }
-
-  int largest = 0;
-  int empty = 0;
-  for (size_t label = 0; label < frontiers.size(); ++label) {
-    largest = std::max(largest, cells[label]);
-    empty += cells[label] == 0;
-    frontiers[label].prob =
-        std::pow(std::max(1.0, static_cast<double>(cells[label])), gtWorkloadExponent_);
-  }
-  RCLCPP_INFO(
-      get_logger(),
-      "GT workload: %zu frontiers, %d unseen free cells (%d unassigned), largest %d, %d empty",
-      frontiers.size(), unseen, unassigned, largest, empty);
 }
 
 bool GlobalPlanner::isPointInFreeSpace(

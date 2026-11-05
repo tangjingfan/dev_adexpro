@@ -113,48 +113,6 @@ BASELINES = {
             delay_s=10.0,
         ),
     ),
-    # The workload experiment: no floor plan is predicted, map-edge frontiers
-    # only. frontier_only is the control (equal weights), oworkload weights each
-    # frontier by the ground-truth area behind it.
-    "frontier_only": BaselineSpec(
-        name="frontier_only",
-        mapping=_mapping(),
-        extras=(
-            LaunchPane(
-                label="map_prediction",
-                cmd_template="ros2 launch simulator no_map_prediction.launch",
-                conda_env="adexpro",
-                delay_s=10.0,
-            ),
-        ),
-        planner=LaunchPane(
-            label="planner",
-            cmd_template="ros2 launch simulator planner_{world}.launch planner_overlay:=frontier_only_planner.yaml",
-            delay_s=10.0,
-        ),
-    ),
-    "oworkload": BaselineSpec(
-        name="oworkload",
-        mapping=_mapping(),
-        extras=(
-            LaunchPane(
-                label="reference",
-                cmd_template="ros2 run grid_recorder reference_publisher {world}",
-                delay_s=8.0,
-            ),
-            LaunchPane(
-                label="map_prediction",
-                cmd_template="ros2 launch simulator no_map_prediction.launch",
-                conda_env="adexpro",
-                delay_s=10.0,
-            ),
-        ),
-        planner=LaunchPane(
-            label="planner",
-            cmd_template="ros2 launch simulator planner_{world}.launch planner_overlay:=oworkload_planner.yaml",
-            delay_s=10.0,
-        ),
-    ),
     "greedy": BaselineSpec(
         name="greedy",
         mapping=_mapping(),

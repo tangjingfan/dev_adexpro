@@ -19,14 +19,11 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <set>
 #include <string>
 #include <thread>
-#include <utility>
 #include <vector>
 
 using OccupancyGridSubscriberPtr = rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr;
@@ -67,7 +64,6 @@ enum class PredictedFrontierMode {
   Poisson,  // Poisson-disk thinning at global_cluster_size
   Region,   // one vertex per connected predicted region (groupPredictedRegions)
   Tile,     // one vertex per world-anchored tile, TARE-style (tilePredictedFrontiers)
-  None,     // no predicted vertices: map-edge frontiers only
 };
 
 // A world-anchored square tile of the predicted-frontier lattice.
@@ -145,16 +141,6 @@ private:
   void initializeTimers();
 
   void visibleCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
-  // vertex_weight = gt_workload: overwrite each frontier's prob with the unseen
-  // ground-truth free cells closest to it (see global_planner_frontiers.cpp).
-  // Map-edge frontiers that survive the inflated reachability: see the .cpp.
-  std::vector<Point2D> selectMapEdgeFrontiers(
-      const std::vector<Point2D>& rawFrontiers,
-      const nav_msgs::msg::OccupancyGrid& visible,
-      const Point2D& robotMapPos,
-      const ReachabilityData& reachability) const;
-  void applyGtWorkload(std::vector<Point2D>& frontiers,
-                       const nav_msgs::msg::OccupancyGrid& visible) const;
   void predictedCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
   void confidenceCallback(const prob_msgs::msg::ProbGrid::SharedPtr msg);
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
@@ -335,10 +321,6 @@ private:
   OccupancyGridSubscriberPtr visibleSub_{};
   OccupancyGridSubscriberPtr predictedSub_{};
   ProbGridSubscriberPtr confidenceSub_{};
-  rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr gtFreeSub_{};
-  // Latched once at startup, read by the planning thread.
-  mutable std::mutex gtFreeMutex_;
-  nav_msgs::msg::OccupancyGrid::ConstSharedPtr gtFreeMap_{};
   OdomSubscriberPtr odomSub_{};
   ReplanSubscriberPtr replanSub_{};
   BoolSubscriberPtr explorationEnabledSub_{};
@@ -473,18 +455,6 @@ private:
   // Tile mode: tile edge (m) and the share of a tile's cells that must be
   // candidates for it to become a vertex.
   double predictedTileSizeM_{4.0};
-  bool useGtWorkload_{false};
-  // Wall frontier handling (wall_frontier_* parameters).
-  bool wallFrontierSnap_{false};
-  int wallFrontierVisitRadiusCells_{5};
-  double wallFrontierMaxDwellS_{5.0};
-  // World cell of a moved frontier -> seconds the robot has spent close to it
-  // while it stayed. Touched only by the map-edge frontier task of the planning
-  // thread, hence mutable behind the const pipeline.
-  mutable std::map<std::pair<int, int>, double> wallFrontierDwellS_{};
-  mutable std::set<std::pair<int, int>> wallFrontierBlacklist_{};
-  mutable std::optional<rclcpp::Time> lastWallFrontierCheck_{};
-  double gtWorkloadExponent_{1.0};
   double predictedTileMinFraction_{0.1};
   // Minimum separation (cells) between a predicted frontier and a map-edge
   // one. The two pipelines are thinned independently, so without this they can
