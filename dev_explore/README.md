@@ -26,8 +26,10 @@ dev_explore/
 │   │                      the three prediction launches, rviz/expro.rviz
 │   ├── msgs/              prob_msgs (ProbGrid confidence), rpv_msgs (planning stats)
 │   └── plugins/           RViz plugins
-├── grid_recorder/         records the occupancy grid size over a run (grid_metrics.csv); started
-│                          by simulator's mapping launches
+├── grid_recorder/         saves the occupancy grid over a run (occupancy_grid/<t_s>.npz);
+│                          started by simulator's mapping launches.
+│                          `ros2 run grid_recorder make_reference <world> --output ...` builds
+│                          the ground truth in ../dev_results/ground_truth/
 └── experiment_runner/     batch runs from YAML (config/); used by scripts/run_experiments.sh
 ```
 

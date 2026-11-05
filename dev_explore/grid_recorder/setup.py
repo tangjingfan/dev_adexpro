@@ -5,7 +5,7 @@ package_name = 'grid_recorder'
 setup(
     name=package_name,
     version='0.0.0',
-    packages=find_packages(),
+    packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -20,6 +20,8 @@ setup(
     entry_points={
         'console_scripts': [
             'grid_recorder = grid_recorder.grid_recorder:main',
+            'make_reference = grid_recorder.make_reference:main',
+            'reference_publisher = grid_recorder.reference_publisher:main',
         ],
     },
 )

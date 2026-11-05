@@ -1,10 +1,14 @@
-"""Records the size of the occupancy grid over a run.
+"""Records the occupancy grid over a run, for comparing runs afterwards.
 
-Started with the mapping stack (simulator's mapping_<world>.launch). Each
-/projected_map adds a row to <EXPRO_RUN_DIR>/grid_metrics.csv:
-    t_s, known_cells, free_cells, occupied_cells, known_area_m2
-t_s comes from /time_duration, the same clock as visualization_tools' metrics
-file. Rows are flushed as they are written, so killing the run loses nothing.
+Started with the mapping stack (simulator's mapping_<world>.launch). Every
+`save_period_s` the latest /projected_map is saved as
+<EXPRO_RUN_DIR>/occupancy_grid/<t_s>.npz, holding:
+    data        the grid, int8 [row (y), col (x)]: -1 unknown, 0 free, > 0 occupied
+    origin      world x, y of cell (0, 0)
+    resolution  metres per cell
+    t_s         seconds on /time_duration, the same clock as visualization_tools'
+                metrics file
+Each file appears whole, so killing the run loses at most the latest period.
 Without EXPRO_RUN_DIR (mapping launched by hand) nothing is recorded.
 """
 
@@ -17,44 +21,44 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from std_msgs.msg import Float32
 
-CSV_HEADER = "t_s,known_cells,free_cells,occupied_cells,known_area_m2\n"
-
 
 class GridRecorder(Node):
 
     def __init__(self):
         super().__init__("grid_recorder")
+        self.save_period_s = self.declare_parameter("save_period_s", 1.0).value
         self.t_s = None
-        self.csv = None
+        self.last_saved_t = None
         run_dir = os.environ.get("EXPRO_RUN_DIR", "").strip()
         if not run_dir:
-            self.get_logger().info("EXPRO_RUN_DIR not set; not recording the grid size")
+            self.get_logger().info("EXPRO_RUN_DIR not set; not recording the occupancy grid")
             return
-        os.makedirs(run_dir, exist_ok=True)
-        path = os.path.join(run_dir, "grid_metrics.csv")
-        self.csv = open(path, "w", buffering=1)
-        self.csv.write(CSV_HEADER)
+        self.out_dir = os.path.join(run_dir, "occupancy_grid")
+        os.makedirs(self.out_dir, exist_ok=True)
         self.create_subscription(Float32, "/time_duration", self._time_cb, 10)
         self.create_subscription(OccupancyGrid, "/projected_map", self._map_cb, 10)
-        self.get_logger().info(f"Recording the grid size to {path}")
+        self.get_logger().info(f"Recording the occupancy grid to {self.out_dir}")
 
     def _time_cb(self, msg):
         self.t_s = msg.data
 
     def _map_cb(self, msg):
-        # Before /time_duration starts there is no clock to stamp the row with.
+        # Before /time_duration starts there is no clock to stamp the grid with.
         if self.t_s is None:
             return
-        grid = np.asarray(msg.data, dtype=np.int8)
-        free = int(np.count_nonzero(grid == 0))
-        occupied = int(np.count_nonzero(grid > 0))
-        known = free + occupied
-        area = known * msg.info.resolution ** 2
-        self.csv.write(f"{self.t_s:.3f},{known},{free},{occupied},{area:.2f}\n")
-
-    def close(self):
-        if self.csv is not None:
-            self.csv.close()
+        if self.last_saved_t is not None and self.t_s - self.last_saved_t < self.save_period_s:
+            return
+        self.last_saved_t = self.t_s
+        info = msg.info
+        tmp = os.path.join(self.out_dir, "latest.tmp.npz")
+        np.savez_compressed(
+            tmp,
+            data=np.asarray(msg.data, dtype=np.int8).reshape(info.height, info.width),
+            origin=np.array([info.origin.position.x, info.origin.position.y]),
+            resolution=np.float64(info.resolution),
+            t_s=np.float64(self.t_s),
+        )
+        os.replace(tmp, os.path.join(self.out_dir, f"{self.t_s:09.3f}.npz"))
 
 
 def main(args=None):
@@ -65,7 +69,6 @@ def main(args=None):
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.close()
         node.destroy_node()
         rclpy.try_shutdown()
 

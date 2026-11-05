@@ -16,7 +16,8 @@ Two methods:
 │                      self-adapt, experiment runner
 ├── dev_baselines/     baseline planners (TARE, GBPlanner2, NBVP, ARiADNE, CogniPlan, MapEx, greedy)
 ├── dev_visualization/ ROS visualization: prediction_eval (accuracy vs GT), prediction_heatmap (live window)
-├── dev_results/       experiments/: all run output (git-ignored, created on the first run)
+├── dev_results/       ground_truth/: occupancy-grid ground truth per world, to compare runs with
+│                      experiments/: all run output (git-ignored, created on the first run)
 └── build/ install/ log/   the repo root is the colcon workspace (git-ignored)
 ```
 
@@ -93,8 +94,7 @@ tmux kill-session -t adexpro
 ```
 
 Each run writes to its own folder, `dev_results/experiments/<method>/<world>/<stamp>/`: `logs/`
-(node logs), `metrics_*.txt` and `trajectory_*.txt`, `grid_metrics.csv` (occupancy grid size over
-time), `prediction_eval/`, and where they apply
+(node logs), `metrics_*.txt` and `trajectory_*.txt`, `occupancy_grid/` (grid snapshots, one per second), `prediction_eval/`, and where they apply
 `run.csv` (batch runs) and `online_train/` (AdExPro). Batch runs also append to
 `dev_results/experiments/summary.csv`. While a method runs, a live heatmap window shows where its map predictions are right or wrong, see
 [dev_visualization/README.md](dev_visualization/README.md).

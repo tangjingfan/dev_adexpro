@@ -21,7 +21,7 @@ class LaunchPane:
 class BaselineSpec:
     name: str                                 # tmux session base name
     planner: LaunchPane                       # required, the main planner pane
-    mapping: Optional[LaunchPane] = None      # also records the grid size (grid_recorder)
+    mapping: Optional[LaunchPane] = None      # also records the occupancy grid (grid_recorder)
     extras: Tuple[LaunchPane, ...] = ()       # e.g. map_prediction for adexpro
 
     def format(self, template: str, world: str) -> str:
@@ -160,7 +160,7 @@ BASELINES = {
             delay_s=10.0,
         ),
     ),
-    # TARE plans without this map; it runs only to record the grid size.
+    # TARE plans without this map; it runs only to record the occupancy grid.
     "tare": BaselineSpec(
         name="tare",
         mapping=_mapping(),

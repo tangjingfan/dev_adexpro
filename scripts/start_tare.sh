@@ -10,7 +10,7 @@ start_session tare 2 2
 run_pane 0 "$SIM_CMD"
 
 # ── Pane 1 (bottom-left): Mapping / octomap_server ─────────────────────────
-# TARE plans without this map; it runs only to record the grid size.
+# TARE plans without this map; it runs only to record the occupancy grid.
 run_pane 1 "$MAPPING_CMD"
 
 # ── Pane 2 (top-right): TARE planner ────────────────────────────────────────

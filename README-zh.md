@@ -16,7 +16,8 @@
 │                      self-adapt、实验 runner
 ├── dev_baselines/     baseline 规划器（TARE、GBPlanner2、NBVP、ARiADNE、CogniPlan、MapEx、greedy）
 ├── dev_visualization/ ROS 可视化：prediction_eval（预测与真值对比）、prediction_heatmap（实时窗口）
-├── dev_results/       experiments/：所有运行输出（git 忽略，第一次运行时自动创建）
+├── dev_results/       ground_truth/：每张地图的 occupancy grid 真值，用来和运行结果对比
+│                      experiments/：所有运行输出（git 忽略，第一次运行时自动创建）
 └── build/ install/ log/   repo 根目录就是 colcon workspace（git 忽略）
 ```
 
@@ -92,5 +93,5 @@ tmux kill-session -t adexpro
 ./scripts/run_experiments.sh indoor_self_adapt
 ```
 
-每次运行都写到自己的文件夹 `dev_results/experiments/<方法>/<地图>/<时间戳>/`：`logs/`（节点日志）、`metrics_*.txt` 和 `trajectory_*.txt`、`grid_metrics.csv`（occupancy grid 大小随时间的变化）、`prediction_eval/`，以及按需生成的 `run.csv`（批量运行）和 `online_train/`（AdExPro）。批量运行还会追加写入 `dev_results/experiments/summary.csv`。运行时还会弹出一个实时热力图窗口，显示地图预测哪里对、哪里错，
+每次运行都写到自己的文件夹 `dev_results/experiments/<方法>/<地图>/<时间戳>/`：`logs/`（节点日志）、`metrics_*.txt` 和 `trajectory_*.txt`、`occupancy_grid/`（occupancy grid 快照，每秒一张）、`prediction_eval/`，以及按需生成的 `run.csv`（批量运行）和 `online_train/`（AdExPro）。批量运行还会追加写入 `dev_results/experiments/summary.csv`。运行时还会弹出一个实时热力图窗口，显示地图预测哪里对、哪里错，
 见 [dev_visualization/README.md](dev_visualization/README.md)。
