@@ -370,16 +370,6 @@ private:
   std::vector<std::vector<Entry>> frontiers_;
 };
 
-// Optional order constraints on the tour; -1 leaves a constraint off. They
-// restrict which vertex may come next but still visit every vertex, so the
-// cost accounting, the PT heuristic and the dominance rule are unchanged.
-//   last_vertex: may only be entered once every other vertex is visited.
-//   first_hop:   the only vertex that may follow the start.
-struct RPVConstraints {
-  long last_vertex = -1;
-  long first_hop = -1;
-};
-
 struct RPVResult {
   long final_label_id = -1;
   std::vector<long> path;
@@ -714,9 +704,6 @@ public:
   // Rebuild path from final_label_id via parent_ chain.
   void ConstructPath();
 
-  // Applies to the next Search/FocalSearch; checked against the graph there.
-  void SetConstraints(const RPVConstraints &c) { constraints_ = c; }
-
 private:
   void SetGraph(PlannerGraph *g);
   void SetProb(std::vector<double> &p) { prob_ = p; }
@@ -768,16 +755,6 @@ private:
   // Greedy nearest-neighbor tour to seed the upper bound.
   double RunGreedy(long start, std::vector<long> &path_out) const;
 
-  // Whether the constraints let v follow a label at visited_set (whose size is
-  // visited_count), v itself unvisited.
-  bool Allowed(uint64_t visited_set, long visited_count, long v) const {
-    if (v == constraints_.last_vertex && (visited_set | (1ull << v)) != full_mask_) {
-      return false;
-    }
-    return constraints_.first_hop < 0 || visited_count != 1 || v == constraints_.first_hop;
-  }
-  void CheckConstraints(long vo) const;
-
   // Create the root label at vo, store it as label 0 and return a copy; the
   // caller pushes it onto its own open list.
   RPVLabel CreateRootLabel(long vo);
@@ -798,7 +775,6 @@ private:
   std::vector<std::vector<double>> adj_cost_; // adj_cost_[u][i] = scalar edge cost
   std::vector<double> prob_;
   double time_limit_ = 0.0;
-  RPVConstraints constraints_{};
 
   double eps_;
   bool use_heuristic_;
@@ -877,12 +853,6 @@ int RunMinSumRPVFocal(raplab::SparseGraph *g, long vo, std::vector<double> &p,
 int RunMinSumRPVFocal(raplab::SparseGraph *g, long vo, std::vector<double> &p,
                       double time_limit, bool use_heuristic,
                       raplab::HeuristicMode mode, raplab::DominanceMode dom,
-                      raplab::RPVResult &res);
-// Same, State dominance, with order constraints (see RPVConstraints).
-int RunMinSumRPVFocal(raplab::SparseGraph *g, long vo, std::vector<double> &p,
-                      double time_limit, bool use_heuristic,
-                      raplab::HeuristicMode mode,
-                      const raplab::RPVConstraints &constraints,
                       raplab::RPVResult &res);
 
 int RunMinMaxRPVFocal(raplab::SparseGraph *g, long vo, std::vector<double> &p,

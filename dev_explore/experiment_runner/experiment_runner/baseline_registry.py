@@ -170,16 +170,6 @@ BASELINES = {
             delay_s=8.0,
         ),
     ),
-    # TARE with its local TSP ordering replaced by the RPV (dev_explore/planner/tare_rpv).
-    "tare_rpv": BaselineSpec(
-        name="tare_rpv",
-        mapping=_mapping(),
-        planner=LaunchPane(
-            label="planner",
-            cmd_template="ros2 launch tare_rpv explore_{world}.launch",
-            delay_s=8.0,
-        ),
-    ),
     "gbp2": BaselineSpec(
         name="gbp2",
         mapping=_mapping(),
